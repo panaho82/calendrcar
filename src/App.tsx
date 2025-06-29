@@ -991,7 +991,7 @@ const Sidebar = ({
 
       {/* Menu Items */}
       <nav className="mt-8">
-        <div className="space-y-4">
+        <div className="space-y-8">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
