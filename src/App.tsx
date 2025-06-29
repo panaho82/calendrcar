@@ -997,12 +997,12 @@ const Sidebar = ({
             <button
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
-              className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors ${
-                currentPage === item.id ? 'bg-blue-600 border-r-4 border-blue-400' : ''
+              className={`w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg ${
+                currentPage === item.id ? 'bg-blue-600 shadow-lg' : 'hover:shadow-md'
               }`}
             >
               <Icon className="h-6 w-6 flex-shrink-0" />
-              <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
                 {item.label}
               </span>
             </button>
@@ -1043,20 +1043,20 @@ const Sidebar = ({
 
         <button 
           onClick={onToggleTheme}
-          className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors"
+          className="w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md"
         >
           {isDarkMode ? <Sun className="h-6 w-6 flex-shrink-0" /> : <Moon className="h-6 w-6 flex-shrink-0" />}
-          <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             {isDarkMode ? 'Mode clair' : 'Mode sombre'}
           </span>
         </button>
         
         <button 
           onClick={() => setIsPWASettingsOpen(true)}
-          className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors relative"
+          className="w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md relative"
         >
           <Smartphone className="h-6 w-6 flex-shrink-0" />
-          <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             Paramètres PWA
           </span>
           {pwa.notifications.permission === 'granted' && (
@@ -1066,10 +1066,10 @@ const Sidebar = ({
 
         <button 
           onClick={() => setIsPWASettingsOpen(true)}
-          className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors"
+          className="w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md"
         >
           <Settings className="h-6 w-6 flex-shrink-0" />
-          <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             Paramètres
           </span>
         </button>
@@ -1097,11 +1097,11 @@ const Sidebar = ({
               logout();
               showNotification('Déconnexion réussie', 'info');
             }}
-            className="w-full flex items-center px-4 py-3 text-left hover:bg-red-600/20 transition-colors text-red-400 hover:text-red-300"
+            className="w-full flex items-center px-4 py-4 text-left hover:bg-red-600/20 transition-colors text-red-400 hover:text-red-300 rounded-lg hover:shadow-md"
             title="Se déconnecter"
           >
             <LogOut className="h-6 w-6 flex-shrink-0" />
-            <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
               Déconnexion
             </span>
           </button>
