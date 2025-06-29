@@ -35,9 +35,10 @@ import {
 // import { usePWA } from './hooks/usePWA';
 // import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 
-// Imports pour l'authentification
-import { AuthProvider, useAuth } from './AuthContext';
-import LoginPage from './LoginPage';
+// Imports pour l'authentification - TEST
+import TestAuth from './TestAuth';
+// import { AuthProvider, useAuth } from './AuthContext';
+// import LoginPage from './LoginPage';
 
 interface Vehicle {
   id: string;
@@ -701,7 +702,9 @@ const Sidebar = ({
   onToggleTheme: () => void,
   showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void
 }) => {
-  const { logout, username } = useAuth();
+  // const { logout, username } = useAuth();
+  const logout = () => console.log('logout');
+  const username = 'admin';
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPWASettingsOpen, setIsPWASettingsOpen] = useState(false);
   // Temporairement désactivé pour les tests
@@ -3602,35 +3605,9 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
-// Composant App avec gestion d'authentification
+// Composant App temporairement sans authentification
 const App: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de CalendrCar...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginPage />;
-  }
-
   return <AuthenticatedApp />;
 };
 
-// Composant racine avec AuthProvider
-const AppWithAuth: React.FC = () => {
-  return (
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  );
-};
-
-export default AppWithAuth;
+export default App;
