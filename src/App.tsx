@@ -997,12 +997,12 @@ const Sidebar = ({
             <button
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
-              className={`w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg ${
-                currentPage === item.id ? 'bg-blue-600 shadow-lg' : 'hover:shadow-md'
+              className={`w-full flex items-center px-4 py-6 mb-3 text-left hover:bg-gray-800 transition-colors rounded-lg ${
+                currentPage === item.id ? 'bg-blue-600 shadow-lg border-l-4 border-blue-300' : 'hover:shadow-md hover:bg-gray-700'
               }`}
             >
               <Icon className="h-6 w-6 flex-shrink-0" />
-              <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
                 {item.label}
               </span>
             </button>
@@ -1043,10 +1043,10 @@ const Sidebar = ({
 
         <button 
           onClick={onToggleTheme}
-          className="w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md"
+          className="w-full flex items-center px-4 py-5 mb-3 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md hover:bg-gray-700"
         >
           {isDarkMode ? <Sun className="h-6 w-6 flex-shrink-0" /> : <Moon className="h-6 w-6 flex-shrink-0" />}
-          <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             {isDarkMode ? 'Mode clair' : 'Mode sombre'}
           </span>
         </button>
