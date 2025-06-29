@@ -1,0 +1,57 @@
+{
+  "short_name": "CalendrCar",
+  "name": "CalendrCar - Gestion de Location de Véhicules",
+  "description": "Application de gestion et planning pour location de véhicules",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#3B82F6",
+  "background_color": "#ffffff",
+  "scope": "/",
+  "categories": ["business", "productivity"],
+  "lang": "fr",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Nouveau Planning",
+      "short_name": "Planning",
+      "description": "Accéder directement au planning",
+      "url": "/?page=planning",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Nouvelle Réservation",
+      "short_name": "Réservation",
+      "description": "Créer une nouvelle réservation",
+      "url": "/?action=new-reservation",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Véhicules",
+      "short_name": "Véhicules",
+      "description": "Gérer les véhicules",
+      "url": "/?page=vehicles",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    }
+  ]
+}

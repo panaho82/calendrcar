@@ -1,0 +1,2834 @@
+import React, { useEffect, useState } from "react";
+import { 
+  Calendar, 
+  Clock, 
+  Car, 
+  Phone, 
+  User, 
+  Plus, 
+  Search, 
+  Settings, 
+  ChevronLeft, 
+  ChevronRight, 
+  MoreVertical,
+  BarChart3,
+  CalendarDays,
+  Truck,
+  X,
+  Trash2,
+  Save,
+  Sun,
+  Moon,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Info,
+  Bell,
+  BellOff,
+  Download,
+  Wifi,
+  WifiOff,
+  Smartphone
+} from "lucide-react";
+import { usePWA } from './hooks/usePWA';
+import { useNotificationScheduler } from './hooks/useNotificationScheduler';
+
+interface Vehicle {
+  id: string;
+  name: string;
+  plate: string;
+  type: string;
+  status: "available" | "occupied" | "maintenance";
+  color: string;
+  icon: string;
+}
+
+interface Reservation {
+  id: string;
+  title: string;
+  client: string;
+  phone: string;
+  vehicleId: string;
+  startTime: Date;
+  endTime: Date;
+  status: "confirmed" | "pending" | "cancelled";
+  notes?: string;
+  amount?: number;
+}
+
+const INITIAL_VEHICLES: Vehicle[] = [
+  { id: "1", name: "Peugeot 208", plate: "274-474-P", type: "Citadine", status: "available", color: "#3B82F6", icon: "🚗" },
+  { id: "2", name: "Peugeot 208", plate: "274-473-P", type: "Citadine", status: "available", color: "#10B981", icon: "🚗" },
+  { id: "3", name: "Hyundai I20", plate: "292-666", type: "Compacte", status: "available", color: "#6B7280", icon: "🚙" },
+  { id: "4", name: "Mitsubishi Mirage", plate: "273-663-P", type: "Citadine", status: "available", color: "#EF4444", icon: "🚗" },
+  { id: "5", name: "Kia Niro", plate: "272-696-P", type: "SUV", status: "available", color: "#22C55E", icon: "🚙" },
+  { id: "6", name: "Kia Picanto", plate: "272-695-P", type: "Citadine", status: "available", color: "#8B5CF6", icon: "🚗" },
+  { id: "7", name: "Scooter", plate: "BW-2943", type: "Scooter", status: "available", color: "#06B6D4", icon: "🛵" },
+  { id: "8", name: "Scooter", plate: "BW-2945", type: "Scooter", status: "available", color: "#F59E0B", icon: "🛵" },
+];
+
+const VEHICLES_STORAGE_KEY = "calendrcar-vehicles";
+
+const EXAMPLE_RESERVATIONS: Reservation[] = [
+  {
+    id: "1",
+    title: "Location Longue Durée",
+    client: "Gilles Dupont",
+    phone: "87770338",
+    vehicleId: "1",
+    startTime: new Date(2024, 11, 16, 9, 0, 0), // 16 décembre 2024, 09:00
+    endTime: new Date(2024, 11, 19, 17, 0, 0), // 19 décembre 2024, 17:00
+    status: "confirmed",
+    notes: "Reste à régler 20000 XPF - Retour prévu",
+    amount: 45000
+  },
+  {
+    id: "2",
+    title: "Location Weekend",
+    client: "Dauphin Tlurel",
+    phone: "87744470",
+    vehicleId: "2",
+    startTime: new Date(2024, 11, 17, 10, 0, 0), // 17 décembre 2024, 10:00
+    endTime: new Date(2024, 11, 20, 18, 0, 0), // 20 décembre 2024, 18:00
+    status: "confirmed",
+    amount: 28000
+  },
+  {
+    id: "3",
+    title: "Location Semaine",
+    client: "Roger Martin",
+    phone: "87284020",
+    vehicleId: "3",
+    startTime: new Date(2024, 11, 15, 8, 30, 0), // 15 décembre 2024, 08:30
+    endTime: new Date(2024, 11, 21, 16, 30, 0), // 21 décembre 2024, 16:30
+    status: "pending",
+    notes: "Axel réglera",
+    amount: 65000
+  },
+  {
+    id: "4",
+    title: "Location Vacances",
+    client: "Terai Johnson",
+    phone: "87264319",
+    vehicleId: "4",
+    startTime: new Date(2024, 11, 18, 9, 30, 0), // 18 décembre 2024, 09:30
+    endTime: new Date(2024, 11, 22, 17, 30, 0), // 22 décembre 2024, 17:30
+    status: "confirmed",
+    amount: 52000
+  },
+  {
+    id: "5",
+    title: "Formation Conduite",
+    client: "Marie Blanc",
+    phone: "87123456",
+    vehicleId: "5",
+    startTime: new Date(2024, 11, 19, 14, 0, 0), // 19 décembre 2024, 14:00
+    endTime: new Date(2024, 11, 19, 18, 0, 0), // 19 décembre 2024, 18:00
+    status: "confirmed",
+    amount: 12000
+  },
+  {
+    id: "6",
+    title: "Voyage Affaires",
+    client: "Paul Noir",
+    phone: "87987654",
+    vehicleId: "6",
+    startTime: new Date(2024, 11, 14, 11, 0, 0), // 14 décembre 2024, 11:00
+    endTime: new Date(2024, 11, 18, 15, 0, 0), // 18 décembre 2024, 15:00
+    status: "pending",
+    amount: 48000
+  },
+];
+
+const STORAGE_KEY = "calendrcar-reservations";
+
+const formatDate = (date: Date) => {
+  return date.toLocaleDateString('fr-FR', { 
+    weekday: 'short', 
+    day: 'numeric', 
+    month: 'short' 
+  });
+};
+
+const formatTime = (date: Date) => {
+  return date.toLocaleTimeString('fr-FR', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+};
+
+const getDuration = (start: Date, end: Date) => {
+  const diff = end.getTime() - start.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  
+  if (days > 0) {
+    return `${days}j ${remainingHours}h`;
+  }
+  return `${hours}h`;
+};
+
+// Fonction pour convertir une date en format datetime-local sans décalage UTC
+const formatDateTimeLocal = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "confirmed": return "bg-green-100 text-green-800 border-green-200";
+    case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    case "cancelled": return "bg-red-100 text-red-800 border-red-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+};
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case "confirmed": return "✓";
+    case "pending": return "⏳";
+    case "cancelled": return "✗";
+    default: return "•";
+  }
+};
+
+// Composant Notification Toast
+const Toast = ({ 
+  message, 
+  type = 'info', 
+  isVisible, 
+  onClose 
+}: { 
+  message: string, 
+  type?: 'success' | 'error' | 'warning' | 'info', 
+  isVisible: boolean, 
+  onClose: () => void 
+}) => {
+  const icons = {
+    success: CheckCircle,
+    error: XCircle,
+    warning: AlertCircle,
+    info: Info
+  };
+
+  const colors = {
+    success: 'bg-green-500 border-green-600',
+    error: 'bg-red-500 border-red-600',
+    warning: 'bg-yellow-500 border-yellow-600',
+    info: 'bg-blue-500 border-blue-600'
+  };
+
+  const Icon = icons[type];
+
+  useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(onClose, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, onClose]);
+
+  if (!isVisible) return null;
+
+  return (
+    <div className={`fixed top-4 right-4 z-50 transform transition-all duration-300 ${
+      isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+    }`}>
+      <div className={`${colors[type]} border-l-4 p-4 rounded-lg shadow-lg max-w-sm`}>
+        <div className="flex items-center">
+          <Icon className="h-5 w-5 text-white mr-3" />
+          <p className="text-white font-medium">{message}</p>
+          <button 
+            onClick={onClose}
+            className="ml-auto text-white hover:text-gray-200 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+  };
+
+// Composant Loading Spinner
+const LoadingSpinner = ({ isDarkMode }: { isDarkMode: boolean }) => {
+  return (
+    <div className="flex items-center justify-center space-x-2">
+      <div className={`w-2 h-2 rounded-full animate-pulse ${isDarkMode ? 'bg-blue-400' : 'bg-blue-600'}`}></div>
+      <div className={`w-2 h-2 rounded-full animate-pulse ${isDarkMode ? 'bg-blue-400' : 'bg-blue-600'}`} style={{ animationDelay: '0.2s' }}></div>
+      <div className={`w-2 h-2 rounded-full animate-pulse ${isDarkMode ? 'bg-blue-400' : 'bg-blue-600'}`} style={{ animationDelay: '0.4s' }}></div>
+    </div>
+  );
+};
+
+// Composant Modal amélioré
+const Modal = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  isDarkMode,
+  size = 'md' 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  title: string, 
+  children: React.ReactNode,
+  isDarkMode: boolean,
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+}) => {
+  const sizeClasses = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl'
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fadeInUp">
+      <div 
+        className={`relative w-full mx-4 ${sizeClasses[size]} ${
+          isDarkMode 
+            ? 'bg-gray-800 border-gray-700' 
+            : 'bg-white border-gray-200'
+        } rounded-xl shadow-2xl border transition-all-300 animate-slideInRight`}
+      >
+        {/* Header */}
+        <div className={`flex items-center justify-between p-6 border-b ${
+          isDarkMode ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          <h3 className={`text-lg font-semibold ${
+            isDarkMode ? 'text-white' : 'text-gray-900'
+          }`}>
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg transition-colors hover:${
+              isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+            }`}
+          >
+            <X className={`h-5 w-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+  };
+
+// Composant de graphique simple (barre de progression)
+const ProgressBar = ({ 
+  value, 
+  max, 
+  label, 
+  color = 'blue', 
+  isDarkMode 
+}: { 
+  value: number, 
+  max: number, 
+  label: string, 
+  color?: string, 
+  isDarkMode: boolean 
+}) => {
+  const percentage = (value / max) * 100;
+  const colorClasses = {
+    blue: 'bg-blue-500',
+    green: 'bg-green-500',
+    yellow: 'bg-yellow-500',
+    red: 'bg-red-500',
+    purple: 'bg-purple-500'
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="flex justify-between mb-2">
+        <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+          {label}
+        </span>
+        <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          {value}/{max}
+        </span>
+      </div>
+      <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+        <div 
+          className={`h-2 rounded-full transition-all duration-500 ${colorClasses[color as keyof typeof colorClasses]}`}
+          style={{ width: `${Math.min(percentage, 100)}%` }}
+        ></div>
+      </div>
+    </div>
+  );
+  };
+
+// Composant PWA Settings Panel
+const PWASettingsPanel = ({ 
+  isDarkMode, 
+  isOpen, 
+  onClose, 
+  showNotification 
+}: { 
+  isDarkMode: boolean, 
+  isOpen: boolean, 
+  onClose: () => void,
+  showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void 
+}) => {
+  const pwa = usePWA();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubscribeNotifications = async () => {
+    setIsLoading(true);
+    try {
+      await pwa.notifications.subscribe();
+      showNotification('Notifications activées avec succès !', 'success');
+    } catch (error) {
+      console.error('Erreur souscription:', error);
+      showNotification('Erreur lors de l\'activation des notifications', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnsubscribeNotifications = async () => {
+    setIsLoading(true);
+    try {
+      await pwa.notifications.unsubscribe();
+      showNotification('Notifications désactivées', 'info');
+    } catch (error) {
+      console.error('Erreur désabonnement:', error);
+      showNotification('Erreur lors de la désactivation', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInstallPWA = async () => {
+    setIsLoading(true);
+    try {
+      await pwa.install.install();
+      showNotification('Application installée avec succès !', 'success');
+    } catch (error) {
+      console.error('Erreur installation:', error);
+      showNotification('Erreur lors de l\'installation', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestNotification = async (type: string) => {
+    setIsLoading(true);
+    try {
+      await pwa.notifications.sendTestNotification(type);
+      showNotification(`Notification de test envoyée: ${type}`, 'info');
+    } catch (error) {
+      console.error('Erreur notification test:', error);
+      showNotification('Erreur lors de l\'envoi du test', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fadeInUp">
+      <div className={`relative w-full mx-4 max-w-2xl ${
+        isDarkMode 
+          ? 'bg-gray-800 border-gray-700' 
+          : 'bg-white border-gray-200'
+      } rounded-xl shadow-2xl border transition-all-300 animate-slideInRight`}>
+        {/* Header */}
+        <div className={`flex items-center justify-between p-6 border-b ${
+          isDarkMode ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          <div className="flex items-center space-x-3">
+            <Smartphone className={`h-6 w-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            <h3 className={`text-xl font-semibold ${
+              isDarkMode ? 'text-white' : 'text-gray-900'
+            }`}>
+              Paramètres PWA
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg transition-colors hover:${
+              isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+            }`}
+          >
+            <X className={`h-5 w-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-6">
+          {/* Statut de connexion */}
+          <div className={`p-4 rounded-lg ${
+            pwa.isOnline 
+              ? (isDarkMode ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200')
+              : (isDarkMode ? 'bg-red-900/20 border-red-700' : 'bg-red-50 border-red-200')
+          } border`}>
+            <div className="flex items-center space-x-3">
+              {pwa.isOnline ? 
+                <Wifi className="h-5 w-5 text-green-600" /> : 
+                <WifiOff className="h-5 w-5 text-red-600" />
+              }
+              <div>
+                <p className={`font-medium ${
+                  pwa.isOnline 
+                    ? 'text-green-800' + (isDarkMode ? ' dark:text-green-200' : '')
+                    : 'text-red-800' + (isDarkMode ? ' dark:text-red-200' : '')
+                }`}>
+                  {pwa.isOnline ? 'En ligne' : 'Hors ligne'}
+                </p>
+                <p className={`text-sm ${
+                  pwa.isOnline 
+                    ? 'text-green-600' + (isDarkMode ? ' dark:text-green-300' : '')
+                    : 'text-red-600' + (isDarkMode ? ' dark:text-red-300' : '')
+                }`}>
+                  {pwa.isOnline 
+                    ? 'Synchronisation active avec le serveur'
+                    : 'Mode hors ligne - données locales uniquement'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Installation PWA */}
+          {pwa.install.showInstallPrompt && (
+            <div className={`p-4 rounded-lg border ${
+              isDarkMode ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Download className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className={`font-medium ${
+                      isDarkMode ? 'text-blue-200' : 'text-blue-800'
+                    }`}>
+                      Installer CalendrCar
+                    </p>
+                    <p className={`text-sm ${
+                      isDarkMode ? 'text-blue-300' : 'text-blue-600'
+                    }`}>
+                      Accès rapide depuis votre bureau
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleInstallPWA}
+                  disabled={isLoading}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isDarkMode
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  } disabled:opacity-50`}
+                >
+                  {isLoading ? <LoadingSpinner isDarkMode={isDarkMode} /> : 'Installer'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pwa.install.isInstalled && (
+            <div className={`p-4 rounded-lg border ${
+              isDarkMode ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'
+            }`}>
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className={`font-medium ${
+                    isDarkMode ? 'text-green-200' : 'text-green-800'
+                  }`}>
+                    Application installée
+                  </p>
+                  <p className={`text-sm ${
+                    isDarkMode ? 'text-green-300' : 'text-green-600'
+                  }`}>
+                    CalendrCar est maintenant accessible depuis votre bureau
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Notifications Push */}
+          <div className={`border rounded-lg ${
+            isDarkMode ? 'border-gray-700' : 'border-gray-200'
+          }`}>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <Bell className={`h-5 w-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`} />
+                  <div>
+                    <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Notifications Push
+                    </p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Statut: {pwa.notifications.permission === 'granted' ? 'Activées' : 
+                               pwa.notifications.permission === 'denied' ? 'Refusées' : 'Non configurées'}
+                    </p>
+                  </div>
+                </div>
+                
+                {pwa.notifications.permission !== 'granted' ? (
+                  <button
+                    onClick={handleSubscribeNotifications}
+                    disabled={isLoading}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      isDarkMode
+                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    } disabled:opacity-50`}
+                  >
+                    {isLoading ? <LoadingSpinner isDarkMode={isDarkMode} /> : 'Activer'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleUnsubscribeNotifications}
+                    disabled={isLoading}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      isDarkMode
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                    } disabled:opacity-50`}
+                  >
+                    {isLoading ? <LoadingSpinner isDarkMode={isDarkMode} /> : 'Désactiver'}
+                  </button>
+                )}
+              </div>
+
+              {/* Tests de notifications */}
+              {pwa.notifications.permission === 'granted' && (
+                <div className="space-y-3">
+                  <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Tester les notifications:
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => handleTestNotification('reservation-reminder')}
+                      disabled={isLoading}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        isDarkMode
+                          ? 'border-gray-600 hover:bg-gray-700 text-gray-300'
+                          : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+                      } disabled:opacity-50`}
+                    >
+                      Rappel Réservation
+                    </button>
+                    <button
+                      onClick={() => handleTestNotification('vehicle-maintenance')}
+                      disabled={isLoading}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        isDarkMode
+                          ? 'border-gray-600 hover:bg-gray-700 text-gray-300'
+                          : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+                      } disabled:opacity-50`}
+                    >
+                      Maintenance
+                    </button>
+                    <button
+                      onClick={() => handleTestNotification('new-reservation')}
+                      disabled={isLoading}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        isDarkMode
+                          ? 'border-gray-600 hover:bg-gray-700 text-gray-300'
+                          : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+                      } disabled:opacity-50`}
+                    >
+                      Nouvelle Réservation
+                    </button>
+                    <button
+                      onClick={() => handleTestNotification('low-fuel')}
+                      disabled={isLoading}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        isDarkMode
+                          ? 'border-gray-600 hover:bg-gray-700 text-gray-300'
+                          : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+                      } disabled:opacity-50`}
+                    >
+                      Carburant Bas
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Support PWA */}
+          <div className={`p-4 rounded-lg border ${
+            pwa.isSupported
+              ? (isDarkMode ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200')
+              : (isDarkMode ? 'bg-red-900/20 border-red-700' : 'bg-red-50 border-red-200')
+          }`}>
+            <div className="flex items-center space-x-3">
+              <Smartphone className={`h-5 w-5 ${pwa.isSupported ? 'text-green-600' : 'text-red-600'}`} />
+              <div>
+                <p className={`font-medium ${
+                  pwa.isSupported 
+                    ? 'text-green-800' + (isDarkMode ? ' dark:text-green-200' : '')
+                    : 'text-red-800' + (isDarkMode ? ' dark:text-red-200' : '')
+                }`}>
+                  {pwa.isSupported ? 'PWA Supportée' : 'PWA Non Supportée'}
+                </p>
+                <p className={`text-sm ${
+                  pwa.isSupported 
+                    ? 'text-green-600' + (isDarkMode ? ' dark:text-green-300' : '')
+                    : 'text-red-600' + (isDarkMode ? ' dark:text-red-300' : '')
+                }`}>
+                  {pwa.isSupported 
+                    ? 'Toutes les fonctionnalités PWA sont disponibles'
+                    : 'Ce navigateur ne supporte pas toutes les fonctionnalités PWA'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Composant Sidebar
+const Sidebar = ({ 
+  currentPage, 
+  setCurrentPage, 
+  isDarkMode, 
+  onToggleTheme,
+  showNotification 
+}: { 
+  currentPage: string, 
+  setCurrentPage: (page: string) => void,
+  isDarkMode: boolean,
+  onToggleTheme: () => void,
+  showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isPWASettingsOpen, setIsPWASettingsOpen] = useState(false);
+  const pwa = usePWA();
+
+  const menuItems = [
+    { id: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
+    { id: 'planning', label: 'Planning', icon: CalendarDays },
+    { id: 'vehicles', label: 'Véhicules', icon: Truck },
+  ];
+
+  return (
+    <div 
+      className={`fixed left-0 top-0 h-full bg-gray-900 text-white transition-all duration-300 ease-in-out z-50 ${
+        isExpanded ? 'w-64' : 'w-16'
+      }`}
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+    >
+      {/* Logo */}
+      <div className="flex items-center p-4 border-b border-gray-700">
+        <Car className="h-8 w-8 text-blue-400 flex-shrink-0" />
+        <div className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <h1 className="text-xl font-bold">CalendrCar</h1>
+        </div>
+      </div>
+
+      {/* Menu Items */}
+      <nav className="mt-8">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setCurrentPage(item.id)}
+              className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors ${
+                currentPage === item.id ? 'bg-blue-600 border-r-4 border-blue-400' : ''
+              }`}
+            >
+              <Icon className="h-6 w-6 flex-shrink-0" />
+              <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Bouton thème et settings en bas */}
+      <div className="absolute bottom-4 w-full space-y-2">
+        {/* Indicateur PWA */}
+        {pwa.install.showInstallPrompt && (
+          <div className="mx-4 mb-2">
+            <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full flex items-center space-x-1">
+              <Download className="h-3 w-3" />
+              <span className={`transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                Installation disponible
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Statut de connexion */}
+        <div className="mx-4 mb-2">
+          <div className={`flex items-center space-x-2 px-2 py-1 rounded-lg ${
+            pwa.isOnline 
+              ? 'bg-green-600/20 text-green-400' 
+              : 'bg-red-600/20 text-red-400'
+          }`}>
+            {pwa.isOnline ? 
+              <Wifi className="h-3 w-3" /> : 
+              <WifiOff className="h-3 w-3" />
+            }
+            <span className={`text-xs transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              {pwa.isOnline ? 'En ligne' : 'Hors ligne'}
+            </span>
+          </div>
+        </div>
+
+        <button 
+          onClick={onToggleTheme}
+          className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors"
+        >
+          {isDarkMode ? <Sun className="h-6 w-6 flex-shrink-0" /> : <Moon className="h-6 w-6 flex-shrink-0" />}
+          <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            {isDarkMode ? 'Mode clair' : 'Mode sombre'}
+          </span>
+        </button>
+        
+        <button 
+          onClick={() => setIsPWASettingsOpen(true)}
+          className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors relative"
+        >
+          <Smartphone className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            Paramètres PWA
+          </span>
+          {pwa.notifications.permission === 'granted' && (
+            <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full"></div>
+          )}
+        </button>
+
+        <button 
+          onClick={() => setIsPWASettingsOpen(true)}
+          className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors"
+        >
+          <Settings className="h-6 w-6 flex-shrink-0" />
+          <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            Paramètres
+          </span>
+        </button>
+      </div>
+
+      {/* PWA Settings Panel */}
+      <PWASettingsPanel
+        isDarkMode={isDarkMode}
+        isOpen={isPWASettingsOpen}
+        onClose={() => setIsPWASettingsOpen(false)}
+        showNotification={showNotification}
+      />
+    </div>
+  );
+};
+
+// Composant Dashboard
+const Dashboard = ({ reservations, vehicles, isDarkMode, showNotification }: { reservations: Reservation[], vehicles: Vehicle[], isDarkMode: boolean, showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void }) => {
+  // Statistiques de base
+  const totalRevenue = reservations.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const confirmedReservations = reservations.filter(r => r.status === 'confirmed').length;
+  const pendingReservations = reservations.filter(r => r.status === 'pending').length;
+  const cancelledReservations = reservations.filter(r => r.status === 'cancelled').length;
+  const availableVehicles = vehicles.filter(v => v.status === 'available').length;
+  const occupiedVehicles = vehicles.filter(v => v.status === 'occupied').length;
+  const maintenanceVehicles = vehicles.filter(v => v.status === 'maintenance').length;
+
+  // Statistiques avancées
+  const totalReservations = reservations.length;
+  const revenueMoyenParReservation = totalReservations > 0 ? Math.round(totalRevenue / totalReservations) : 0;
+  const tauxOccupation = vehicles.length > 0 ? Math.round((occupiedVehicles / vehicles.length) * 100) : 0;
+  const tauxConfirmation = totalReservations > 0 ? Math.round((confirmedReservations / totalReservations) * 100) : 0;
+
+  // Réservations par type de véhicule
+  const reservationsByVehicleType = vehicles.reduce((acc, vehicle) => {
+    const vehicleReservations = reservations.filter(r => r.vehicleId === vehicle.id);
+    acc[vehicle.type] = (acc[vehicle.type] || 0) + vehicleReservations.length;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const stats = [
+    { label: 'Revenus Total', value: `${totalRevenue.toLocaleString()} XPF`, icon: BarChart3, color: 'bg-green-500', trend: '+12%' },
+    { label: 'Réservations Confirmées', value: confirmedReservations, icon: Calendar, color: 'bg-blue-500', trend: '+8%' },
+    { label: 'En Attente', value: pendingReservations, icon: Clock, color: 'bg-yellow-500', trend: '-2%' },
+    { label: 'Véhicules Disponibles', value: availableVehicles, icon: Car, color: 'bg-purple-500', trend: '0%' },
+  ];
+
+  const advancedStats = [
+    { label: 'Taux d\'Occupation', value: `${tauxOccupation}%`, description: 'Véhicules en cours d\'utilisation' },
+    { label: 'Taux de Confirmation', value: `${tauxConfirmation}%`, description: 'Réservations confirmées vs total' },
+    { label: 'Revenus Moyen/Réservation', value: `${revenueMoyenParReservation.toLocaleString()} XPF`, description: 'Montant moyen par location' },
+    { label: 'Total Réservations', value: totalReservations, description: 'Toutes réservations confondues' },
+  ];
+
+    return (
+    <div className="space-y-6 animate-fadeInUp">
+      <div>
+        <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Tableau de bord</h2>
+        
+        {/* Statistiques principales */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            const isPositiveTrend = stat.trend.startsWith('+');
+            const isNegativeTrend = stat.trend.startsWith('-');
+            
+            return (
+              <div 
+                key={index} 
+                className={`rounded-xl shadow-sm border p-6 hover-lift transition-all-300 ${
+                  isDarkMode 
+                    ? 'bg-gray-800 border-gray-700' 
+                    : 'bg-white border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className={`p-3 rounded-lg ${stat.color}`}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <div className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stat.value}</div>
+                      <div className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>{stat.label}</div>
+                    </div>
+                  </div>
+                  <div className={`text-sm font-medium px-2 py-1 rounded-full ${
+                    isPositiveTrend 
+                      ? 'bg-green-100 text-green-800' 
+                      : isNegativeTrend 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {stat.trend}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Statistiques avancées */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Métriques de performance */}
+          <div className={`rounded-xl shadow-sm border p-6 ${
+            isDarkMode 
+              ? 'bg-gray-800 border-gray-700' 
+              : 'bg-white border-gray-200'
+          }`}>
+            <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              Métriques de Performance
+            </h3>
+            <div className="space-y-6">
+              {advancedStats.map((stat, index) => (
+                <div key={index} className="flex justify-between items-start">
+                  <div>
+                    <div className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {stat.value}
+                    </div>
+                    <div className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {stat.label}
+                    </div>
+                    <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {stat.description}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Répartition des statuts */}
+          <div className={`rounded-xl shadow-sm border p-6 ${
+            isDarkMode 
+              ? 'bg-gray-800 border-gray-700' 
+              : 'bg-white border-gray-200'
+          }`}>
+            <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              État des Véhicules
+            </h3>
+            <div className="space-y-4">
+              <ProgressBar 
+                value={availableVehicles} 
+                max={vehicles.length} 
+                label="Disponibles" 
+                color="green" 
+                isDarkMode={isDarkMode} 
+              />
+              <ProgressBar 
+                value={occupiedVehicles} 
+                max={vehicles.length} 
+                label="Occupés" 
+                color="blue" 
+                isDarkMode={isDarkMode} 
+              />
+              <ProgressBar 
+                value={maintenanceVehicles} 
+                max={vehicles.length} 
+                label="En Maintenance" 
+                color="yellow" 
+                isDarkMode={isDarkMode} 
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Réservations récentes */}
+        <div className={`rounded-xl shadow-sm border ${
+          isDarkMode 
+            ? 'bg-gray-800 border-gray-700' 
+            : 'bg-white border-gray-200'
+        }`}>
+          <div className={`p-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Réservations Récentes</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {reservations.slice(0, 5).map((reservation) => {
+                const vehicle = vehicles.find(v => v.id === reservation.vehicleId);
+                return (
+                  <div key={reservation.id} className={`flex items-center justify-between p-4 rounded-lg ${
+                    isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                  }`}>
+                    <div className="flex items-center space-x-4">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
+                        style={{ backgroundColor: vehicle?.color }}
+                      >
+                        {vehicle?.icon}
+                      </div>
+                                              <div>
+                          <div className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{reservation.client}</div>
+                          <div className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>{vehicle?.name} - {vehicle?.plate}</div>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{reservation.amount} XPF</div>
+                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(reservation.status)}`}>
+                        {getStatusIcon(reservation.status)} {reservation.status}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Composant Modal de modification de réservation
+const ReservationModal = ({ 
+  reservation, 
+  onSave, 
+  onDelete, 
+  onClose,
+  vehicles,
+  reservations 
+}: { 
+  reservation: Reservation, 
+  onSave: (reservation: Reservation) => void, 
+  onDelete: (id: string) => void, 
+  onClose: () => void,
+  vehicles: Vehicle[],
+  reservations: Reservation[]
+}) => {
+  const [formData, setFormData] = useState({
+    title: reservation.title,
+    client: reservation.client,
+    phone: reservation.phone,
+    vehicleId: reservation.vehicleId,
+    startTime: formatDateTimeLocal(reservation.startTime),
+    endTime: formatDateTimeLocal(reservation.endTime),
+    status: reservation.status,
+    notes: reservation.notes || '',
+    amount: reservation.amount || 0
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Vérification des conflits de réservation
+    const newStart = new Date(formData.startTime);
+    const newEnd = new Date(formData.endTime);
+    
+    const conflicts = reservations.filter(res => {
+      if (res.vehicleId !== formData.vehicleId) return false;
+      if (res.id === reservation.id) return false; // Ignorer la réservation actuelle
+      
+      const existingStart = new Date(res.startTime);
+      const existingEnd = new Date(res.endTime);
+      
+      // Vérifier si les périodes se chevauchent
+      return (newStart < existingEnd && newEnd > existingStart);
+    });
+    
+    if (conflicts.length > 0) {
+      const vehicle = vehicles.find(v => v.id === formData.vehicleId);
+      const conflictDetails = conflicts.map(c => 
+        `• ${c.client} du ${formatDate(c.startTime)} ${formatTime(c.startTime)} au ${formatDate(c.endTime)} ${formatTime(c.endTime)}`
+      ).join('\n');
+      
+      // Calculer des créneaux alternatifs pour modification
+      const duration = newEnd.getTime() - newStart.getTime();
+      const vehicleReservations = reservations
+        .filter(r => r.vehicleId === formData.vehicleId && r.id !== reservation.id)
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      
+      const alternatives = [];
+      
+      // Option 1: Après la dernière réservation du jour
+      const sameDay = vehicleReservations.filter(r => {
+        const resDate = new Date(r.endTime);
+        return resDate.toDateString() === newStart.toDateString();
+      });
+      
+      if (sameDay.length > 0) {
+        const lastReservation = sameDay[sameDay.length - 1];
+        const suggestedStart = new Date(lastReservation.endTime);
+        suggestedStart.setMinutes(suggestedStart.getMinutes() + 30);
+        const suggestedEnd = new Date(suggestedStart.getTime() + duration);
+        
+        alternatives.push({
+          start: suggestedStart,
+          end: suggestedEnd,
+          label: `Après la réservation de ${lastReservation.client}`
+        });
+      }
+      
+      // Option 2: Avant la première réservation du jour
+      const firstToday = vehicleReservations.find(r => {
+        const resDate = new Date(r.startTime);
+        return resDate.toDateString() === newStart.toDateString();
+      });
+      
+      if (firstToday) {
+        const suggestedEnd = new Date(firstToday.startTime);
+        suggestedEnd.setMinutes(suggestedEnd.getMinutes() - 30);
+        const suggestedStart = new Date(suggestedEnd.getTime() - duration);
+        
+        if (suggestedStart >= new Date()) {
+          alternatives.push({
+            start: suggestedStart,
+            end: suggestedEnd,
+            label: `Avant la réservation de ${firstToday.client}`
+          });
+        }
+      }
+      
+      let message = `⚠️ CONFLIT DE RÉSERVATION DÉTECTÉ !\n\n` +
+        `Le véhicule "${vehicle?.name} (${vehicle?.plate})" est déjà réservé pendant cette période :\n\n` +
+        `${conflictDetails}\n\n`;
+      
+      if (alternatives.length > 0) {
+        message += `🕒 CRÉNEAUX ALTERNATIFS PROPOSÉS :\n\n`;
+        alternatives.forEach((alt, index) => {
+          message += `${index + 1}. ${alt.label}\n   Du ${formatDate(alt.start)} ${formatTime(alt.start)} au ${formatDate(alt.end)} ${formatTime(alt.end)}\n\n`;
+        });
+        message += `Choisissez :\n`;
+        alternatives.forEach((_, index) => {
+          message += `${index + 1} = Utiliser le créneau ${index + 1}\n`;
+        });
+        message += `0 = Forcer le double booking\n`;
+        message += `Annuler = Abandonner`;
+        
+        const choice = prompt(message);
+        
+        if (choice === null) {
+          return;
+        }
+        
+        const choiceNum = parseInt(choice);
+        if (choiceNum >= 1 && choiceNum <= alternatives.length) {
+          const selectedAlt = alternatives[choiceNum - 1];
+          setFormData({
+            ...formData,
+            startTime: formatDateTimeLocal(selectedAlt.start),
+            endTime: formatDateTimeLocal(selectedAlt.end)
+          });
+          return;
+        } else if (choiceNum === 0) {
+          // Continuer avec le double booking
+        } else {
+          return;
+        }
+      } else {
+        const confirmed = window.confirm(
+          message + `Voulez-vous tout de même modifier cette réservation ?\n\n⚠️ Cela créera un double booking !`
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+      }
+    }
+    
+    const updatedReservation: Reservation = {
+      ...reservation,
+      title: formData.title,
+      client: formData.client,
+      phone: formData.phone,
+      vehicleId: formData.vehicleId,
+      startTime: newStart,
+      endTime: newEnd,
+      status: formData.status as "confirmed" | "pending" | "cancelled",
+      notes: formData.notes,
+      amount: formData.amount
+    };
+    onSave(updatedReservation);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Modifier la réservation</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Titre
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Client
+              </label>
+              <input
+                type="text"
+                value={formData.client}
+                onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Téléphone
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Véhicule
+              </label>
+              <select
+                value={formData.vehicleId}
+                onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                {vehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.name} - {vehicle.plate}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date et heure de début
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date et heure de fin
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Statut
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as "confirmed" | "pending" | "cancelled" })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="confirmed">Confirmé</option>
+                <option value="pending">En attente</option>
+                <option value="cancelled">Annulé</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Montant (XPF)
+              </label>
+              <input
+                type="number"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                min="0"
+                step="1"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows={3}
+              placeholder="Notes additionnelles..."
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-4">
+            <button
+              type="button"
+              onClick={() => onDelete(reservation.id)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Supprimer</span>
+            </button>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <Save className="h-4 w-4" />
+                <span>Enregistrer</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Composant Modal de nouvelle réservation
+const NewReservationModal = ({ 
+  onSave, 
+  onClose,
+  vehicles,
+  reservations,
+  preSelectedVehicleId,
+  preSelectedDate 
+}: { 
+  onSave: (reservation: Omit<Reservation, 'id'>) => void, 
+  onClose: () => void,
+  vehicles: Vehicle[],
+  reservations: Reservation[],
+  preSelectedVehicleId?: string | null,
+  preSelectedDate?: Date | null
+}) => {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  
+  // Calculer les dates par défaut
+  const defaultStartDate = preSelectedDate || now;
+  const defaultEndDate = new Date(defaultStartDate);
+  defaultEndDate.setHours(defaultStartDate.getHours() + 2); // 2 heures par défaut
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    client: '',
+    phone: '',
+    vehicleId: preSelectedVehicleId || vehicles[0]?.id || '',
+    startTime: formatDateTimeLocal(defaultStartDate),
+    endTime: formatDateTimeLocal(defaultEndDate),
+    status: 'pending' as "confirmed" | "pending" | "cancelled",
+    notes: '',
+    amount: 0
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Vérification des conflits de réservation
+    const newStart = new Date(formData.startTime);
+    const newEnd = new Date(formData.endTime);
+    
+    const conflicts = reservations.filter(reservation => {
+      if (reservation.vehicleId !== formData.vehicleId) return false;
+      
+      const existingStart = new Date(reservation.startTime);
+      const existingEnd = new Date(reservation.endTime);
+      
+      // Vérifier si les périodes se chevauchent
+      return (newStart < existingEnd && newEnd > existingStart);
+    });
+    
+    if (conflicts.length > 0) {
+      const vehicle = vehicles.find(v => v.id === formData.vehicleId);
+      const conflictDetails = conflicts.map(c => 
+        `• ${c.client} du ${formatDate(c.startTime)} ${formatTime(c.startTime)} au ${formatDate(c.endTime)} ${formatTime(c.endTime)}`
+      ).join('\n');
+      
+      // Calculer des créneaux alternatifs
+      const duration = newEnd.getTime() - newStart.getTime(); // Durée de la réservation
+      const vehicleReservations = reservations
+        .filter(r => r.vehicleId === formData.vehicleId)
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      
+      const alternatives = [];
+      
+      // Option 1: Commencer 30 minutes après la fin de la dernière réservation qui finit le même jour
+      const sameDay = vehicleReservations.filter(r => {
+        const resDate = new Date(r.endTime);
+        return resDate.toDateString() === newStart.toDateString();
+      });
+      
+      if (sameDay.length > 0) {
+        const lastReservation = sameDay[sameDay.length - 1];
+        const suggestedStart = new Date(lastReservation.endTime);
+        suggestedStart.setMinutes(suggestedStart.getMinutes() + 30);
+        const suggestedEnd = new Date(suggestedStart.getTime() + duration);
+        
+        alternatives.push({
+          start: suggestedStart,
+          end: suggestedEnd,
+          label: `Après la réservation de ${lastReservation.client}`
+        });
+      }
+      
+      // Option 2: Commencer 30 minutes avant la première réservation du jour
+      const firstToday = vehicleReservations.find(r => {
+        const resDate = new Date(r.startTime);
+        return resDate.toDateString() === newStart.toDateString();
+      });
+      
+      if (firstToday) {
+        const suggestedEnd = new Date(firstToday.startTime);
+        suggestedEnd.setMinutes(suggestedEnd.getMinutes() - 30);
+        const suggestedStart = new Date(suggestedEnd.getTime() - duration);
+        
+        if (suggestedStart >= new Date()) { // Pas dans le passé
+          alternatives.push({
+            start: suggestedStart,
+            end: suggestedEnd,
+            label: `Avant la réservation de ${firstToday.client}`
+          });
+        }
+      }
+      
+      // Option 3: Le lendemain à la même heure
+      const nextDay = new Date(newStart);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayEnd = new Date(newEnd);
+      nextDayEnd.setDate(nextDayEnd.getDate() + 1);
+      
+      alternatives.push({
+        start: nextDay,
+        end: nextDayEnd,
+        label: "Le lendemain à la même heure"
+      });
+      
+      let message = `⚠️ CONFLIT DE RÉSERVATION DÉTECTÉ !\n\n` +
+        `Le véhicule "${vehicle?.name} (${vehicle?.plate})" est déjà réservé pendant cette période :\n\n` +
+        `${conflictDetails}\n\n`;
+      
+      if (alternatives.length > 0) {
+        message += `🕒 CRÉNEAUX ALTERNATIFS PROPOSÉS :\n\n`;
+        alternatives.forEach((alt, index) => {
+          message += `${index + 1}. ${alt.label}\n   Du ${formatDate(alt.start)} ${formatTime(alt.start)} au ${formatDate(alt.end)} ${formatTime(alt.end)}\n\n`;
+        });
+        message += `Choisissez :\n`;
+        alternatives.forEach((_, index) => {
+          message += `${index + 1} = Utiliser le créneau ${index + 1}\n`;
+        });
+        message += `0 = Forcer le double booking\n`;
+        message += `Annuler = Abandonner`;
+        
+        const choice = prompt(message);
+        
+        if (choice === null) {
+          return; // Annulé
+        }
+        
+        const choiceNum = parseInt(choice);
+        if (choiceNum >= 1 && choiceNum <= alternatives.length) {
+          // Utiliser le créneau alternatif choisi
+          const selectedAlt = alternatives[choiceNum - 1];
+          setFormData({
+            ...formData,
+            startTime: formatDateTimeLocal(selectedAlt.start),
+            endTime: formatDateTimeLocal(selectedAlt.end)
+          });
+          return; // Arrêter ici pour permettre à l'utilisateur de vérifier
+        } else if (choiceNum === 0) {
+          // Continuer avec le double booking
+          // (continue avec la logique existante)
+        } else {
+          return; // Choix invalide, abandonner
+        }
+      } else {
+        const confirmed = window.confirm(
+          message + `Voulez-vous tout de même créer cette réservation ?\n\n⚠️ Cela créera un double booking !`
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+      }
+    }
+    
+    const newReservation: Omit<Reservation, 'id'> = {
+      title: formData.title,
+      client: formData.client,
+      phone: formData.phone,
+      vehicleId: formData.vehicleId,
+      startTime: newStart,
+      endTime: newEnd,
+      status: formData.status,
+      notes: formData.notes,
+      amount: formData.amount
+    };
+    onSave(newReservation);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Nouvelle réservation</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Titre *
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Location Weekend"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Client *
+              </label>
+              <input
+                type="text"
+                value={formData.client}
+                onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Nom du client"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Téléphone *
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: 87770338"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Véhicule *
+              </label>
+              <select
+                value={formData.vehicleId}
+                onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                {vehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.icon} {vehicle.name} - {vehicle.plate}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date et heure de début *
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date et heure de fin *
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Statut
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as "confirmed" | "pending" | "cancelled" })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="pending">En attente</option>
+                <option value="confirmed">Confirmé</option>
+                <option value="cancelled">Annulé</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Montant (XPF)
+              </label>
+              <input
+                type="number"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                min="0"
+                step="1"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows={3}
+              placeholder="Notes additionnelles..."
+            />
+          </div>
+
+          <div className="flex items-center justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <Save className="h-4 w-4" />
+              <span>Créer la réservation</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Composant Planning
+const Planning = ({ reservations, setReservations, vehicles, isDarkMode, showNotification }: { reservations: Reservation[], setReservations: (reservations: Reservation[]) => void, vehicles: Vehicle[], isDarkMode: boolean, showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"day" | "week">("week");
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewReservationModalOpen, setIsNewReservationModalOpen] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+
+
+  const getWeekDays = (): Date[] => {
+    const week: Date[] = [];
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay() + 1);
+    
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      week.push(day);
+    }
+    return week;
+  };
+
+  const getReservationsForDate = (date: Date, vehicleId: string) => {
+    return reservations.filter(res => {
+      const resDate = new Date(res.startTime);
+      return resDate.toDateString() === date.toDateString() && res.vehicleId === vehicleId;
+    });
+  };
+
+  // Fonction pour calculer les bandes de réservation continues
+  const getReservationBands = (vehicleId: string) => {
+    const vehicleReservations = reservations.filter(res => res.vehicleId === vehicleId);
+    const bands: Array<{
+      reservation: Reservation;
+      startDay: number;
+      duration: number;
+      position: number;
+      isOverlapping: boolean;
+      overlapIndex: number;
+      dailyPositions?: Array<{
+        dayIndex: number;
+        startPercent: number;
+        widthPercent: number;
+      }>;
+    }> = [];
+
+    // Utiliser les mêmes dates selon le mode de vue pour la cohérence
+    const viewDays = viewMode === "week" ? getWeekDays() : [currentDate];
+    const weekStart = viewDays[0]; // Premier jour de la période visible
+    const weekEnd = viewDays[viewDays.length - 1];   // Dernier jour de la période visible
+
+    // Trier les réservations par heure de début pour un traitement correct des chevauchements
+    const sortedReservations = vehicleReservations.sort((a, b) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+
+    sortedReservations.forEach((reservation, index) => {
+      const startDate = new Date(reservation.startTime);
+      const endDate = new Date(reservation.endTime);
+      
+      // Vérifier si la réservation chevauche avec la semaine actuelle
+      const reservationStartsBeforeWeekEnd = startDate <= weekEnd;
+      const reservationEndsAfterWeekStart = endDate >= weekStart;
+      
+      if (reservationStartsBeforeWeekEnd && reservationEndsAfterWeekStart) {
+        // Calculer le jour de début dans la semaine (0-6, 0 = lundi)
+        // Normaliser les dates à minuit pour éviter les problèmes d'heures
+        const normalizedWeekStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+        const normalizedStartDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        const normalizedEndDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        
+        const daysDiff = Math.floor((normalizedStartDate.getTime() - normalizedWeekStart.getTime()) / (1000 * 60 * 60 * 24));
+        const duration = Math.ceil((normalizedEndDate.getTime() - normalizedStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Ajuster pour que la bande reste dans les limites de la période visible
+        const maxDays = viewMode === "week" ? 7 : 1;
+        const adjustedStart = Math.max(0, daysDiff);
+        const adjustedEnd = Math.min(maxDays, daysDiff + duration);
+        const adjustedDuration = adjustedEnd - adjustedStart;
+        
+        if (adjustedDuration > 0) {
+          // Calculer la position horaire précise dans la journée
+          const startHour = startDate.getHours() + startDate.getMinutes() / 60; // Heure décimale (ex: 10.5 pour 10h30)
+          const endHour = endDate.getHours() + endDate.getMinutes() / 60;
+          
+          // Calculer les positions relatives dans chaque jour
+          const dailyPositions = [];
+          for (let dayOffset = 0; dayOffset < adjustedDuration; dayOffset++) {
+            const currentDay = new Date(normalizedStartDate);
+            currentDay.setDate(currentDay.getDate() + dayOffset);
+            
+            let dayStartHour, dayEndHour;
+            
+            if (dayOffset === 0) {
+              // Premier jour : commence à l'heure réelle
+              dayStartHour = startHour;
+              dayEndHour = currentDay.toDateString() === new Date(endDate).toDateString() ? endHour : 24;
+            } else if (dayOffset === adjustedDuration - 1) {
+              // Dernier jour : finit à l'heure réelle
+              dayStartHour = 0;
+              dayEndHour = endHour;
+            } else {
+              // Jours intermédiaires : toute la journée
+              dayStartHour = 0;
+              dayEndHour = 24;
+            }
+            
+            dailyPositions.push({
+              dayIndex: adjustedStart + dayOffset,
+              startPercent: dayStartHour / 24 * 100, // Position de début en % de la journée
+              widthPercent: (dayEndHour - dayStartHour) / 24 * 100 // Largeur en % de la journée
+            });
+          }
+
+          // Détecter les chevauchements temporels
+          const overlappingReservations = sortedReservations.filter((otherRes, otherIndex) => {
+            if (otherIndex >= index) return false;
+            
+            const otherStart = new Date(otherRes.startTime);
+            const otherEnd = new Date(otherRes.endTime);
+            
+            return (startDate < otherEnd && endDate > otherStart);
+          });
+
+          const isOverlapping = overlappingReservations.length > 0;
+          const overlapIndex = overlappingReservations.length;
+
+          bands.push({
+            reservation,
+            startDay: adjustedStart,
+            duration: adjustedDuration,
+            position: isOverlapping ? 0 : index,
+            isOverlapping,
+            overlapIndex,
+            dailyPositions // Nouvelle propriété pour les positions horaires
+          });
+        }
+      }
+    });
+
+    return bands;
+  };
+
+
+
+  const navigateDay = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    if (direction === 'next') {
+      newDate.setDate(currentDate.getDate() + 1);
+    } else {
+      newDate.setDate(currentDate.getDate() - 1);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const handleReservationClick = (reservation: Reservation) => {
+    setSelectedReservation(reservation);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveReservation = (updatedReservation: Reservation) => {
+    const updatedReservations = reservations.map(r => 
+      r.id === updatedReservation.id ? updatedReservation : r
+    );
+    setReservations(updatedReservations);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedReservations));
+    setIsModalOpen(false);
+    setSelectedReservation(null);
+  };
+
+  const handleDeleteReservation = (reservationId: string) => {
+    const updatedReservations = reservations.filter(r => r.id !== reservationId);
+    setReservations(updatedReservations);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedReservations));
+    setIsModalOpen(false);
+    setSelectedReservation(null);
+  };
+
+  const handleCreateReservation = (newReservation: Omit<Reservation, 'id'>) => {
+    const reservation: Reservation = {
+      ...newReservation,
+      id: Date.now().toString()
+    };
+    const updatedReservations = [...reservations, reservation];
+    setReservations(updatedReservations);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedReservations));
+    
+    // Notification automatique pour nouvelle réservation
+    notificationScheduler.notifyNewReservation(reservation);
+    showNotification(`Nouvelle réservation créée pour ${reservation.client}`, 'success');
+    
+    setIsNewReservationModalOpen(false);
+    setSelectedVehicleId(null);
+    setSelectedDate(null);
+  };
+
+  const handleCellClick = (vehicleId: string, date: Date) => {
+    setSelectedVehicleId(vehicleId);
+    setSelectedDate(date);
+    setIsNewReservationModalOpen(true);
+  };
+
+  const today = new Date();
+  const weekDays = viewMode === "week" ? getWeekDays() : [currentDate];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Planning</h2>
+        <div className="flex items-center space-x-4">
+          {/* Sélecteur de vue */}
+          <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("day")}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === "day" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Jour
+            </button>
+            <button
+              onClick={() => setViewMode("week")}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Semaine
+            </button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <button 
+            onClick={() => {
+              setSelectedVehicleId(null);
+              setSelectedDate(null);
+              setIsNewReservationModalOpen(true);
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Nouvelle réservation</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigateDay('prev')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-semibold text-gray-900">
+              {viewMode === "week" 
+                ? `${weekDays[0].toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} - Semaine`
+                : currentDate.toLocaleDateString('fr-FR', { 
+                    weekday: 'long', 
+                    day: 'numeric', 
+                    month: 'long', 
+                    year: 'numeric' 
+                  })
+              }
+            </h3>
+            <button
+              onClick={() => navigateDay('next')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            Aujourd'hui
+          </button>
+        </div>
+      </div>
+
+      {/* Légende (mode semaine uniquement) */}
+      {viewMode === "week" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">Légende</h4>
+          <div className="flex items-center space-x-6 text-xs text-gray-600">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 rounded-lg bg-blue-500 opacity-90"></div>
+              <span>Bandes continues = Réservations multi-jours</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span>Confirmé</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                <span>En attente</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                <span>Annulé</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendrier */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* En-tête du calendrier */}
+        {viewMode === "week" ? (
+          <div className="grid grid-cols-8 bg-gray-50 border-b border-gray-200">
+            <div className="p-4 font-medium text-gray-900 border-r border-gray-200">
+              Véhicules
+            </div>
+            {weekDays.map((day, index) => (
+              <div key={index} className="p-4 text-center border-r border-gray-200 last:border-r-0">
+                <div className="font-medium text-gray-900">
+                  {day.toLocaleDateString('fr-FR', { weekday: 'short' })}
+                </div>
+                <div className={`text-sm mt-1 ${
+                  day.toDateString() === today.toDateString() 
+                    ? 'text-blue-600 font-semibold' 
+                    : 'text-gray-600'
+                }`}>
+                  {day.getDate()}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 bg-gray-50 border-b border-gray-200">
+            <div className="p-4 font-medium text-gray-900 border-r border-gray-200">
+              Véhicules
+            </div>
+            <div className="p-4 text-center">
+              <div className="font-medium text-gray-900">
+                {currentDate.toLocaleDateString('fr-FR', { weekday: 'long' })}
+              </div>
+              <div className={`text-sm mt-1 ${
+                currentDate.toDateString() === today.toDateString() 
+                  ? 'text-blue-600 font-semibold' 
+                  : 'text-gray-600'
+              }`}>
+                {currentDate.getDate()} {currentDate.toLocaleDateString('fr-FR', { month: 'long' })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Grille des véhicules et réservations */}
+        <div className="divide-y divide-gray-200">
+          {vehicles.map((vehicle) => (
+            <div key={`${vehicle.id}-${currentDate.toDateString()}-${viewMode}`} className={`grid ${viewMode === "week" ? "grid-cols-8" : "grid-cols-2"} min-h-[80px] relative`}>
+              {/* Colonne véhicule */}
+              <div className="p-4 bg-gray-50 border-r border-gray-200 flex items-center">
+                <div className="flex items-center space-x-3">
+                  <div 
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
+                    style={{ backgroundColor: vehicle.color }}
+                  >
+                    {vehicle.icon}
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900">{vehicle.name}</div>
+                    <div className="text-sm text-gray-600">{vehicle.plate}</div>
+                    <div className="text-xs text-gray-500">{vehicle.type}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bandes de réservation continues (mode semaine) */}
+              {viewMode === "week" && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="grid grid-cols-8 h-full">
+                    <div></div> {/* Espace pour la colonne véhicule */}
+                    <div className="col-span-7 relative">
+                      {getReservationBands(vehicle.id).map((band, bandIndex) => {
+                          // Couleurs différentes pour chaque réservation
+                          const colors = [
+                            vehicle.color,
+                            '#10B981', // Emerald
+                            '#F59E0B', // Amber  
+                            '#EF4444', // Red
+                            '#8B5CF6', // Violet
+                            '#06B6D4', // Cyan
+                          ];
+                          const bandColor = colors[bandIndex % colors.length];
+                          
+                          // Calculer les positions exactes dans la grille selon le mode de vue
+                          const viewDays = viewMode === "week" ? getWeekDays() : [currentDate];
+                          const startDate = new Date(band.reservation.startTime);
+                          const endDate = new Date(band.reservation.endTime);
+                          
+                          // Trouver les positions exactes dans la période visible
+                          let startDayIndex = -1;
+                          let endDayIndex = -1;
+                          
+                          viewDays.forEach((day, index) => {
+                            const dayStr = day.toDateString();
+                            if (startDate.toDateString() === dayStr) {
+                              startDayIndex = index;
+                            }
+                            if (endDate.toDateString() === dayStr) {
+                              endDayIndex = index;
+                            }
+                          });
+                          
+                          const maxDays = viewDays.length;
+                          // Si les dates ne sont pas trouvées dans la période, utiliser les limites
+                          if (startDayIndex === -1) {
+                            startDayIndex = startDate < viewDays[0] ? 0 : maxDays - 1;
+                          }
+                          if (endDayIndex === -1) {
+                            endDayIndex = endDate > viewDays[maxDays - 1] ? maxDays - 1 : 0;
+                          }
+                          
+                          // Calculer positions avec heures
+                          const startHour = startDate.getHours() + startDate.getMinutes() / 60;
+                          const endHour = endDate.getHours() + endDate.getMinutes() / 60;
+                          
+                          const leftPercent = (startDayIndex / maxDays) * 100 + (startHour / 24 / maxDays) * 100;
+                          
+                          // Largeur : de la position de début à la position de fin
+                          let widthPercent;
+                          if (startDayIndex === endDayIndex) {
+                            // Même jour
+                            widthPercent = ((endHour - startHour) / 24 / maxDays) * 100;
+                          } else {
+                            // Multi-jours : du début jusqu'à la fin
+                            const endPercent = (endDayIndex / maxDays) * 100 + (endHour / 24 / maxDays) * 100;
+                            widthPercent = endPercent - leftPercent;
+                          }
+                          
+
+
+                          return (
+                            <div
+                              key={`${band.reservation.id}-${bandIndex}`}
+                              className={`absolute rounded-lg shadow-md border-2 border-white cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 pointer-events-auto ${
+                                band.isOverlapping ? 'ring-2 ring-yellow-400 ring-opacity-50' : ''
+                              }`}
+                              style={{
+                                backgroundColor: bandColor,
+                                left: `${leftPercent}%`,
+                                width: `${widthPercent}%`,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                height: band.isOverlapping ? '30px' : '35px',
+                                opacity: band.isOverlapping ? 0.85 : 0.9,
+                                minWidth: '10px',
+                                zIndex: band.isOverlapping ? 15 + band.overlapIndex : 10,
+                                maxHeight: '35px',
+                                overflow: 'hidden'
+                              }}
+                              title={`${band.reservation.client} - ${band.reservation.title}\n${formatDate(band.reservation.startTime)} → ${formatDate(band.reservation.endTime)}\n${formatTime(band.reservation.startTime)} - ${formatTime(band.reservation.endTime)}\n${band.reservation.amount} XPF`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReservationClick(band.reservation);
+                              }}
+                            >
+                              <div className="absolute inset-0 flex items-center justify-start px-3 py-2">
+                                <div className="flex items-center space-x-3 w-full">
+                                  <span className="text-white text-sm font-bold truncate">
+                                    {band.reservation.client}
+                                  </span>
+                                  <span className="text-white text-xs opacity-90 truncate">
+                                    {formatDate(band.reservation.startTime).split(' ')[0]} {formatDate(band.reservation.startTime).split(' ')[1]} → {formatDate(band.reservation.endTime).split(' ')[0]} {formatDate(band.reservation.endTime).split(' ')[1]}
+                                  </span>
+                                  <span className="text-white text-xs opacity-80 truncate">
+                                    {formatTime(band.reservation.startTime)} - {formatTime(band.reservation.endTime)}
+                                  </span>
+                                  {band.reservation.notes && (
+                                    <span className="text-white text-xs opacity-75 truncate">
+                                      • {band.reservation.notes}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Indicateur de statut */}
+                              <div className="absolute top-1 right-1 w-2 h-2 rounded-full border border-white" 
+                                   style={{ 
+                                     backgroundColor: band.reservation.status === 'confirmed' ? '#10B981' : 
+                                                    band.reservation.status === 'pending' ? '#F59E0B' : '#EF4444' 
+                                   }}>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Colonnes des jours */}
+              {viewMode === "week" ? (
+                weekDays.map((day, dayIndex) => (
+                  <div 
+                    key={dayIndex} 
+                    onClick={() => handleCellClick(vehicle.id, day)}
+                    className="p-2 border-r border-gray-200 last:border-r-0 min-h-[80px] bg-gray-25 hover:bg-blue-50 cursor-pointer transition-colors"
+                    title={`Créer une réservation pour ${vehicle.name} le ${formatDate(day)}`}
+                  >
+                    {/* Espace pour les bandes de couleur - pas de contenu ici */}
+                  </div>
+                ))
+              ) : (
+                // Vue jour - une seule colonne pour le jour actuel
+                (() => {
+                  const dayReservations = getReservationsForDate(currentDate, vehicle.id);
+                  return (
+                    <div 
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                          handleCellClick(vehicle.id, currentDate);
+                        }
+                      }}
+                      className="p-2 min-h-[80px] hover:bg-blue-50 cursor-pointer transition-colors"
+                      title={`Créer une réservation pour ${vehicle.name} le ${formatDate(currentDate)}`}
+                    >
+                      {dayReservations.map((reservation) => (
+                        <div
+                          key={reservation.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReservationClick(reservation);
+                          }}
+                          className="mb-2 p-3 rounded-lg border-l-4 bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                          style={{ borderLeftColor: vehicle.color }}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(reservation.status)}`}>
+                                  {getStatusIcon(reservation.status)}
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <div className="font-medium text-gray-900 text-sm truncate">
+                                  {reservation.title}
+                                </div>
+                                <div className="flex items-center space-x-1 text-xs text-gray-600 mt-1">
+                                  <User className="h-3 w-3" />
+                                  <span>{reservation.client}</span>
+                                </div>
+                                <div className="flex items-center space-x-1 text-xs text-gray-600">
+                                  <Phone className="h-3 w-3" />
+                                  <span>{reservation.phone}</span>
+                                </div>
+                                <div className="flex items-center space-x-1 text-xs text-gray-600">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {formatTime(reservation.startTime)} - {formatTime(reservation.endTime)}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {getDuration(reservation.startTime, reservation.endTime)}
+                                </div>
+                                {reservation.amount && (
+                                  <div className="text-xs font-medium text-green-600 mt-1">
+                                    {reservation.amount} XPF
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button className="p-1 hover:bg-gray-100 rounded">
+                              <MoreVertical className="h-4 w-4 text-gray-400" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal de modification */}
+      {isModalOpen && selectedReservation && (
+        <ReservationModal
+          reservation={selectedReservation}
+          onSave={handleSaveReservation}
+          onDelete={handleDeleteReservation}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedReservation(null);
+          }}
+          vehicles={vehicles}
+          reservations={reservations}
+        />
+      )}
+
+      {/* Modal de nouvelle réservation */}
+      {isNewReservationModalOpen && (
+        <NewReservationModal
+          onSave={handleCreateReservation}
+          onClose={() => setIsNewReservationModalOpen(false)}
+          vehicles={vehicles}
+          reservations={reservations}
+          preSelectedVehicleId={selectedVehicleId}
+          preSelectedDate={selectedDate}
+        />
+      )}
+    </div>
+  );
+};
+
+// Composant Modal de véhicule (nouveau/modification)
+const VehicleModal = ({ 
+  vehicle, 
+  onSave, 
+  onDelete, 
+  onClose 
+}: { 
+  vehicle?: Vehicle, 
+  onSave: (vehicle: Vehicle | Omit<Vehicle, 'id'>) => void, 
+  onDelete?: (id: string) => void, 
+  onClose: () => void 
+}) => {
+  const isEditing = !!vehicle;
+  
+  const [formData, setFormData] = useState({
+    name: vehicle?.name || '',
+    plate: vehicle?.plate || '',
+    type: vehicle?.type || 'Citadine',
+    status: vehicle?.status || 'available' as "available" | "occupied" | "maintenance",
+    color: vehicle?.color || '#3B82F6',
+    icon: vehicle?.icon || '🚗'
+  });
+
+  const vehicleTypes = ['Citadine', 'Compacte', 'SUV', 'Scooter', 'Utilitaire', 'Moto'];
+  const vehicleIcons = ['🚗', '🚙', '🚐', '🛵', '🏍️', '🚛', '🚌'];
+  const vehicleColors = [
+    '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#F59E0B', 
+    '#06B6D4', '#EC4899', '#84CC16', '#6B7280', '#F97316'
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isEditing && vehicle) {
+      const updatedVehicle: Vehicle = {
+        ...vehicle,
+        ...formData
+      };
+      onSave(updatedVehicle);
+    } else {
+      onSave(formData);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">
+            {isEditing ? 'Modifier le véhicule' : 'Nouveau véhicule'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom du véhicule *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Ex: Peugeot 208"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Plaque d'immatriculation *
+            </label>
+            <input
+              type="text"
+              value={formData.plate}
+              onChange={(e) => setFormData({ ...formData, plate: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Ex: 274-474-P"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Type de véhicule
+              </label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {vehicleTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Statut
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as "available" | "occupied" | "maintenance" })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="available">Disponible</option>
+                <option value="occupied">Occupé</option>
+                <option value="maintenance">En maintenance</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Icône
+            </label>
+            <div className="grid grid-cols-7 gap-2">
+              {vehicleIcons.map((icon) => (
+                <button
+                  key={icon}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, icon })}
+                  className={`p-3 border-2 rounded-lg text-2xl hover:bg-gray-50 transition-colors ${
+                    formData.icon === icon ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Couleur
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {vehicleColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color })}
+                  className={`w-12 h-12 rounded-lg border-2 transition-all ${
+                    formData.color === color ? 'border-gray-800 scale-110' : 'border-gray-200'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Aperçu */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Aperçu
+            </label>
+            <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+              <div 
+                className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-xl"
+                style={{ backgroundColor: formData.color }}
+              >
+                {formData.icon}
+              </div>
+              <div>
+                <div className="font-medium text-gray-900">{formData.name || 'Nom du véhicule'}</div>
+                <div className="text-sm text-gray-600">{formData.plate || 'Plaque'}</div>
+                <div className="text-xs text-gray-500">{formData.type}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4">
+            {isEditing && onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(vehicle!.id)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Supprimer</span>
+              </button>
+            )}
+            <div className={`flex space-x-3 ${!isEditing || !onDelete ? 'w-full justify-end' : ''}`}>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <Save className="h-4 w-4" />
+                <span>{isEditing ? 'Modifier' : 'Créer'}</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Composant Véhicules
+const Vehicles = ({ vehicles, setVehicles, isDarkMode, showNotification }: { vehicles: Vehicle[], setVehicles: (vehicles: Vehicle[]) => void, isDarkMode: boolean, showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewVehicleModalOpen, setIsNewVehicleModalOpen] = useState(false);
+
+  const filteredVehicles = vehicles.filter(vehicle =>
+    vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    vehicle.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleVehicleClick = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveVehicle = (vehicleData: Vehicle | Omit<Vehicle, 'id'>) => {
+    if ('id' in vehicleData) {
+      // Modification d'un véhicule existant
+      const updatedVehicles = vehicles.map(v => 
+        v.id === vehicleData.id ? vehicleData : v
+      );
+      setVehicles(updatedVehicles);
+    } else {
+      // Création d'un nouveau véhicule
+      const newVehicle: Vehicle = {
+        ...vehicleData,
+        id: Date.now().toString()
+      };
+      setVehicles([...vehicles, newVehicle]);
+    }
+    
+    setIsModalOpen(false);
+    setIsNewVehicleModalOpen(false);
+    setSelectedVehicle(null);
+  };
+
+  const handleDeleteVehicle = (vehicleId: string) => {
+    const updatedVehicles = vehicles.filter(v => v.id !== vehicleId);
+    setVehicles(updatedVehicles);
+    setIsModalOpen(false);
+    setSelectedVehicle(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Véhicules</h2>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher un véhicule..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <button 
+            onClick={() => setIsNewVehicleModalOpen(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Ajouter véhicule</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {filteredVehicles.map((vehicle) => (
+          <div 
+            key={vehicle.id} 
+            onClick={() => handleVehicleClick(vehicle)}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+          >
+            <div className="flex items-center space-x-4 mb-4">
+              <div 
+                className="w-16 h-16 rounded-xl flex items-center justify-center text-white text-2xl"
+                style={{ backgroundColor: vehicle.color }}
+              >
+                {vehicle.icon}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900">{vehicle.name}</h3>
+                <p className="text-sm text-gray-600">{vehicle.plate}</p>
+                <p className="text-xs text-gray-500">{vehicle.type}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                vehicle.status === 'available' ? 'bg-green-100 text-green-800' :
+                vehicle.status === 'occupied' ? 'bg-red-100 text-red-800' :
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {vehicle.status === 'available' ? '✓ Disponible' :
+                 vehicle.status === 'occupied' ? '🚫 Occupé' :
+                 '🔧 Maintenance'}
+              </span>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleVehicleClick(vehicle);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <MoreVertical className="h-4 w-4 text-gray-400" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal de modification de véhicule */}
+      {isModalOpen && selectedVehicle && (
+        <VehicleModal
+          vehicle={selectedVehicle}
+          onSave={handleSaveVehicle}
+          onDelete={handleDeleteVehicle}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedVehicle(null);
+          }}
+        />
+      )}
+
+      {/* Modal de nouveau véhicule */}
+      {isNewVehicleModalOpen && (
+        <VehicleModal
+          onSave={handleSaveVehicle}
+          onClose={() => setIsNewVehicleModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+function App() {
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('calendrcar-theme');
+    return saved === 'dark';
+  });
+
+  // État des notifications
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'info',
+    isVisible: false
+  });
+
+  // Fonction pour afficher une notification
+  const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setNotification({
+      message,
+      type,
+      isVisible: true
+    });
+  };
+
+  // Fonction pour fermer la notification
+  const closeNotification = () => {
+    setNotification(prev => ({ ...prev, isVisible: false }));
+  };
+
+  // Hook de planification des notifications
+  const notificationScheduler = useNotificationScheduler(reservations, vehicles);
+
+  useEffect(() => {
+    // Chargement des réservations
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsedData = JSON.parse(saved);
+        const convertedData = parsedData.map((item: any) => ({
+          ...item,
+          startTime: new Date(item.startTime),
+          endTime: new Date(item.endTime)
+        }));
+        setReservations(convertedData);
+      } catch {
+        setReservations(EXAMPLE_RESERVATIONS);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(EXAMPLE_RESERVATIONS));
+      }
+    } else {
+      // Première visite - charger les données d'exemple
+      setReservations(EXAMPLE_RESERVATIONS);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(EXAMPLE_RESERVATIONS));
+    }
+
+    // Chargement des véhicules
+    const savedVehicles = localStorage.getItem(VEHICLES_STORAGE_KEY);
+    if (savedVehicles) {
+      try {
+        const parsedVehicles = JSON.parse(savedVehicles);
+        setVehicles(parsedVehicles);
+      } catch {
+        setVehicles(INITIAL_VEHICLES);
+        localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(INITIAL_VEHICLES));
+      }
+    } else {
+      setVehicles(INITIAL_VEHICLES);
+      localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(INITIAL_VEHICLES));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (reservations.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(reservations));
+    }
+  }, [reservations]);
+
+  useEffect(() => {
+    if (vehicles.length > 0) {
+      localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(vehicles));
+    }
+  }, [vehicles]);
+
+  // Gestion du thème
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem('calendrcar-theme', newTheme ? 'dark' : 'light');
+  };
+
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        return <Dashboard reservations={reservations} vehicles={vehicles} isDarkMode={isDarkMode} showNotification={showNotification} />;
+      case 'planning':
+        return <Planning reservations={reservations} setReservations={setReservations} vehicles={vehicles} isDarkMode={isDarkMode} showNotification={showNotification} />;
+      case 'vehicles':
+        return <Vehicles vehicles={vehicles} setVehicles={setVehicles} isDarkMode={isDarkMode} showNotification={showNotification} />;
+      default:
+        return <Dashboard reservations={reservations} vehicles={vehicles} isDarkMode={isDarkMode} showNotification={showNotification} />;
+    }
+  };
+
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${
+      isDarkMode ? 'bg-gray-900' : 'bg-gray-50'
+    }`}>
+      <Sidebar 
+        currentPage={currentPage} 
+        setCurrentPage={setCurrentPage}
+        isDarkMode={isDarkMode}
+        onToggleTheme={toggleTheme}
+        showNotification={showNotification}
+      />
+      
+      {/* Contenu principal */}
+      <div className="ml-16 transition-all duration-300">
+        <main className="p-6">
+          {renderCurrentPage()}
+        </main>
+      </div>
+
+      {/* Notifications Toast */}
+      <Toast
+        message={notification.message}
+        type={notification.type}
+        isVisible={notification.isVisible}
+        onClose={closeNotification}
+      />
+    </div>
+  );
+}
+
+export default App;
