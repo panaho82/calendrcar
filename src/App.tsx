@@ -990,20 +990,20 @@ const Sidebar = ({
       </div>
 
       {/* Menu Items */}
-      <nav className="mt-8">
-        <div className="space-y-8">
+      <nav className="mt-6">
+        <div className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentPage(item.id)}
-                className={`w-full flex items-center px-4 py-8 my-6 text-left hover:bg-gray-800 transition-colors rounded-lg ${
-                  currentPage === item.id ? 'bg-blue-600 shadow-lg border-l-4 border-blue-300' : 'hover:shadow-md hover:bg-gray-700'
+                className={`w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md ${
+                  currentPage === item.id ? 'bg-blue-600 shadow-md' : 'hover:bg-gray-700'
                 }`}
               >
-                <Icon className={`h-8 w-8 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />
-                <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                <Icon className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />
+                <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
                   {item.label}
                 </span>
               </button>
@@ -1013,7 +1013,7 @@ const Sidebar = ({
       </nav>
 
       {/* Bouton thème et settings en bas */}
-      <div className="absolute bottom-4 w-full space-y-2">
+      <div className="absolute bottom-4 w-full space-y-1">
         {/* Indicateur PWA */}
         {pwa.install.showInstallPrompt && (
           <div className="mx-4 mb-2">
@@ -1045,20 +1045,20 @@ const Sidebar = ({
 
         <button 
           onClick={onToggleTheme}
-          className="w-full flex items-center px-4 py-6 my-4 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md hover:bg-gray-700"
+          className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700"
         >
-          {isDarkMode ? <Sun className={`h-7 w-7 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} /> : <Moon className={`h-7 w-7 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />}
-          <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          {isDarkMode ? <Sun className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} /> : <Moon className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />}
+          <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             {isDarkMode ? 'Mode clair' : 'Mode sombre'}
           </span>
         </button>
         
         <button 
           onClick={() => setIsPWASettingsOpen(true)}
-          className="w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md relative"
+          className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700 relative"
         >
-          <Smartphone className="h-6 w-6 flex-shrink-0" />
-          <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <Smartphone className="h-5 w-5 flex-shrink-0" />
+          <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             Paramètres PWA
           </span>
           {pwa.notifications.permission === 'granted' && (
@@ -1068,10 +1068,10 @@ const Sidebar = ({
 
         <button 
           onClick={() => setIsPWASettingsOpen(true)}
-          className="w-full flex items-center px-4 py-4 mb-2 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md"
+          className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700"
         >
-          <Settings className="h-6 w-6 flex-shrink-0" />
-          <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+          <Settings className="h-5 w-5 flex-shrink-0" />
+          <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             Paramètres
           </span>
         </button>
@@ -1099,11 +1099,11 @@ const Sidebar = ({
               logout();
               showNotification('Déconnexion réussie', 'info');
             }}
-            className="w-full flex items-center px-4 py-4 text-left hover:bg-red-600/20 transition-colors text-red-400 hover:text-red-300 rounded-lg hover:shadow-md"
+            className="w-full flex items-center px-3 py-3 text-left hover:bg-red-600/20 transition-colors text-red-400 hover:text-red-300 rounded-md"
             title="Se déconnecter"
           >
-            <LogOut className="h-6 w-6 flex-shrink-0" />
-            <span className={`ml-4 transition-opacity duration-300 font-medium ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            <LogOut className="h-5 w-5 flex-shrink-0" />
+            <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
               Déconnexion
             </span>
           </button>
