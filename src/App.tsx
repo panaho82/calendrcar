@@ -991,23 +991,25 @@ const Sidebar = ({
 
       {/* Menu Items */}
       <nav className="mt-8">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setCurrentPage(item.id)}
-              className={`w-full flex items-center px-4 py-6 mb-3 text-left hover:bg-gray-800 transition-colors rounded-lg ${
-                currentPage === item.id ? 'bg-blue-600 shadow-lg border-l-4 border-blue-300' : 'hover:shadow-md hover:bg-gray-700'
-              }`}
-            >
-              <Icon className="h-6 w-6 flex-shrink-0" />
-              <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
+        <div className="space-y-4">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentPage(item.id)}
+                className={`w-full flex items-center px-4 py-8 my-6 text-left hover:bg-gray-800 transition-colors rounded-lg ${
+                  currentPage === item.id ? 'bg-blue-600 shadow-lg border-l-4 border-blue-300' : 'hover:shadow-md hover:bg-gray-700'
+                }`}
+              >
+                <Icon className={`h-8 w-8 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />
+                <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Bouton thème et settings en bas */}
@@ -1043,9 +1045,9 @@ const Sidebar = ({
 
         <button 
           onClick={onToggleTheme}
-          className="w-full flex items-center px-4 py-5 mb-3 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md hover:bg-gray-700"
+          className="w-full flex items-center px-4 py-6 my-4 text-left hover:bg-gray-800 transition-colors rounded-lg hover:shadow-md hover:bg-gray-700"
         >
-          {isDarkMode ? <Sun className="h-6 w-6 flex-shrink-0" /> : <Moon className="h-6 w-6 flex-shrink-0" />}
+          {isDarkMode ? <Sun className={`h-7 w-7 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} /> : <Moon className={`h-7 w-7 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />}
           <span className={`ml-5 transition-opacity duration-300 font-semibold text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             {isDarkMode ? 'Mode clair' : 'Mode sombre'}
           </span>
