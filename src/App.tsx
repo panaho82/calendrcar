@@ -36,8 +36,8 @@ import {
 // import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 
 // Imports pour l'authentification
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import LoginPage from './components/LoginPage';
+import { AuthProvider, useAuth } from './AuthContext';
+import LoginPage from './LoginPage';
 
 interface Vehicle {
   id: string;
