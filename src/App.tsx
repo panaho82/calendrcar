@@ -28,11 +28,16 @@ import {
   Download,
   Wifi,
   WifiOff,
-  Smartphone
+  Smartphone,
+  LogOut
 } from "lucide-react";
 // Imports PWA temporairement désactivés pour les tests
 // import { usePWA } from './hooks/usePWA';
 // import { useNotificationScheduler } from './hooks/useNotificationScheduler';
+
+// Imports pour l'authentification
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LoginPage from './components/LoginPage';
 
 interface Vehicle {
   id: string;
@@ -696,6 +701,7 @@ const Sidebar = ({
   onToggleTheme: () => void,
   showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void
 }) => {
+  const { logout, username } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPWASettingsOpen, setIsPWASettingsOpen] = useState(false);
   // Temporairement désactivé pour les tests
@@ -812,6 +818,39 @@ const Sidebar = ({
             Paramètres
           </span>
         </button>
+
+        {/* User Info & Logout */}
+        <div className="border-t border-gray-700 pt-4 mt-4">
+          {/* User Info */}
+          <div className="px-4 py-2 mb-2">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-600 p-2 rounded-full">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              {isExpanded && (
+                <div>
+                  <p className="text-white text-sm font-medium">{username || 'Admin'}</p>
+                  <p className="text-gray-400 text-xs">Administrateur</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Logout Button */}
+          <button
+            onClick={() => {
+              logout();
+              showNotification('Déconnexion réussie', 'info');
+            }}
+            className="w-full flex items-center px-4 py-3 text-left hover:bg-red-600/20 transition-colors text-red-400 hover:text-red-300"
+            title="Se déconnecter"
+          >
+            <LogOut className="h-6 w-6 flex-shrink-0" />
+            <span className={`ml-3 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              Déconnexion
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* PWA Settings Panel */}
@@ -3425,7 +3464,8 @@ const Vehicles = ({ vehicles, setVehicles, isDarkMode, showNotification }: { veh
   );
 };
 
-function App() {
+// Composant principal avec authentification
+const AuthenticatedApp: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -3560,6 +3600,37 @@ function App() {
       />
     </div>
   );
-}
+};
 
-export default App;
+// Composant App avec gestion d'authentification
+const App: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement de CalendrCar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  return <AuthenticatedApp />;
+};
+
+// Composant racine avec AuthProvider
+const AppWithAuth: React.FC = () => {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  );
+};
+
+export default AppWithAuth;
