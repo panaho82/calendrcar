@@ -57,6 +57,18 @@ interface Reservation {
   amount?: number;
 }
 
+interface Alternative {
+  start: Date;
+  end: Date;
+  label: string;
+}
+
+interface DailyPosition {
+  dayIndex: number;
+  startPercent: number;
+  widthPercent: number;
+}
+
 const INITIAL_VEHICLES: Vehicle[] = [
   // Peugeot 208 - Même couleur (bleu)
   { id: "1", name: "Peugeot 208", plate: "274-474-P", type: "Citadine", status: "available", color: "#3B82F6", icon: "🚗" },
@@ -341,8 +353,18 @@ const PWASettingsPanel = ({
   // const pwa = usePWA();
   const pwa = {
     isOnline: true,
-    notifications: { permission: 'default' },
-    install: { showInstallPrompt: false, isInstalled: false }
+    isSupported: true,
+    notifications: { 
+      permission: 'default' as NotificationPermission,
+      subscribe: async () => {},
+      unsubscribe: async () => {},
+      sendTestNotification: async (type: string) => {}
+    },
+    install: { 
+      showInstallPrompt: false, 
+      isInstalled: false,
+      install: async () => {}
+    }
   };
   const [isLoading, setIsLoading] = useState(false);
 
@@ -1477,7 +1499,7 @@ const ReservationModal = ({
         .filter(r => r.vehicleId === formData.vehicleId && r.id !== reservation.id)
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
       
-      const alternatives = [];
+      const alternatives: Alternative[] = [];
       
       // Option 1: Après la dernière réservation du jour
       const sameDay = vehicleReservations.filter(r => {
@@ -1821,7 +1843,7 @@ const NewReservationModal = ({
         .filter(r => r.vehicleId === formData.vehicleId)
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
       
-      const alternatives = [];
+      const alternatives: Alternative[] = [];
       
       // Option 1: Commencer 30 minutes après la fin de la dernière réservation qui finit le même jour
       const sameDay = vehicleReservations.filter(r => {
@@ -2125,7 +2147,7 @@ const Planning = ({ reservations, setReservations, vehicles, setVehicles, isDark
     // Créer une semaine qui "glisse" avec currentDate au centre
     // Pour un défilement jour par jour du planning
     const centerDate = new Date(currentDate);
-    const days = [];
+    const days: Date[] = [];
     
     // Créer 7 jours centrés autour de currentDate
     // currentDate sera toujours au milieu (index 3)
@@ -2224,7 +2246,7 @@ const Planning = ({ reservations, setReservations, vehicles, setVehicles, isDark
           const endHour = endDate.getHours() + endDate.getMinutes() / 60;
           
           // Calculer les positions relatives dans chaque jour
-          const dailyPositions = [];
+          const dailyPositions: DailyPosition[] = [];
           for (let dayOffset = 0; dayOffset < adjustedDuration; dayOffset++) {
             const currentDay = new Date(normalizedStartDate);
             currentDay.setDate(currentDay.getDate() + dayOffset);
