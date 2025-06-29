@@ -29,16 +29,270 @@ import {
   Wifi,
   WifiOff,
   Smartphone,
-  LogOut
+  LogOut,
+  Lock,
+  Eye,
+  EyeOff,
+  LogIn
 } from "lucide-react";
 // Imports PWA temporairement désactivés pour les tests
 // import { usePWA } from './hooks/usePWA';
 // import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 
-// Imports pour l'authentification - TEST
-import TestAuth from './TestAuth';
-// import { AuthProvider, useAuth } from './AuthContext';
-// import LoginPage from './LoginPage';
+// Authentification intégrée directement dans App.tsx
+
+// ==================== AUTHENTIFICATION ====================
+
+interface AuthContextType {
+  isAuthenticated: boolean;
+  username: string | null;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  isLoading: boolean;
+}
+
+const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
+
+const AUTH_STORAGE_KEY = 'calendrcar-auth';
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'calendrcar2024';
+
+const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const authData = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (authData) {
+          const { username: storedUsername, timestamp } = JSON.parse(authData);
+          
+          const sessionDuration = 24 * 60 * 60 * 1000; // 24 heures
+          const now = Date.now();
+          
+          if (now - timestamp < sessionDuration) {
+            setIsAuthenticated(true);
+            setUsername(storedUsername);
+          } else {
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur auth:', error);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const login = async (inputUsername: string, inputPassword: string): Promise<boolean> => {
+    if (inputUsername === ADMIN_USERNAME && inputPassword === ADMIN_PASSWORD) {
+      const authData = {
+        username: ADMIN_USERNAME,
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
+      setIsAuthenticated(true);
+      setUsername(ADMIN_USERNAME);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setIsAuthenticated(false);
+    setUsername(null);
+  };
+
+  const value: AuthContextType = {
+    isAuthenticated,
+    username,
+    login,
+    logout,
+    isLoading
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+const useAuth = (): AuthContextType => {
+  const context = React.useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth doit être utilisé dans un AuthProvider');
+  }
+  return context;
+};
+
+// Page de Login
+const LoginPage: React.FC = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { login } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!username.trim() || !password.trim()) {
+      setError('Veuillez remplir tous les champs');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const success = await login(username.trim(), password);
+      if (!success) {
+        setError('Nom d\'utilisateur ou mot de passe incorrect');
+        setPassword('');
+      }
+    } catch (error) {
+      setError('Erreur de connexion. Veuillez réessayer.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-8 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-white rounded-full p-3 shadow-lg">
+                <Car className="h-8 w-8 text-blue-600" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">CalendrCar</h1>
+            <p className="text-blue-100 text-sm">Gestion de Location de Véhicules</p>
+          </div>
+
+          {/* Form */}
+          <div className="px-8 py-8">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">Connexion Administrateur</h2>
+              <p className="text-gray-500 text-sm">Accédez à votre espace de gestion</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Username Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom d'utilisateur
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                    placeholder="Entrez votre nom d'utilisateur"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mot de passe
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                    placeholder="Entrez votre mot de passe"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={isLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              )}
+
+              {/* Login Button */}
+              <button
+                type="submit"
+                disabled={isLoading || !username.trim() || !password.trim()}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Connexion...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-5 w-5" />
+                    <span>Se connecter</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Demo Credentials */}
+            <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-blue-800 text-sm font-medium mb-2">Credentials de démonstration :</p>
+              <div className="text-blue-700 text-sm space-y-1">
+                <p><strong>Utilisateur :</strong> admin</p>
+                <p><strong>Mot de passe :</strong> calendrcar2024</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6">
+          <p className="text-gray-500 text-xs">
+            © 2024 CalendrCar - Tous droits réservés
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== FIN AUTHENTIFICATION ====================
 
 interface Vehicle {
   id: string;
@@ -702,9 +956,7 @@ const Sidebar = ({
   onToggleTheme: () => void,
   showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void
 }) => {
-  // const { logout, username } = useAuth();
-  const logout = () => console.log('logout');
-  const username = 'admin';
+  const { logout, username } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPWASettingsOpen, setIsPWASettingsOpen] = useState(false);
   // Temporairement désactivé pour les tests
@@ -3605,9 +3857,35 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
-// Composant App temporairement sans authentification
+// Composant App avec gestion d'authentification
 const App: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement de CalendrCar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   return <AuthenticatedApp />;
 };
 
-export default App;
+// Composant racine avec AuthProvider
+const AppWithAuth: React.FC = () => {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  );
+};
+
+export default AppWithAuth;
