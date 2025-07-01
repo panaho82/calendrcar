@@ -1,6 +1,9 @@
 [build]
   publish = "build"
 
+[build.environment]
+  CI = "false"
+
 [[redirects]]
   from = "/static/css/*"
   to = "/static/css/:splat"

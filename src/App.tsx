@@ -24,7 +24,6 @@ import {
   XCircle,
   Info,
   Bell,
-  BellOff,
   Download,
   Wifi,
   WifiOff,
