@@ -3868,10 +3868,22 @@ const AuthenticatedApp: React.FC = () => {
 
   useEffect(() => {
     if (reservations.length > 0) {
-      // Sauvegarder avec Supabase + localStorage
+      // Sauvegarder avec Supabase + localStorage + Auto-Sync
       const saveReservations = async () => {
         try {
           await supabaseService.saveReservations(reservations);
+          
+          // 🚀 ÉTAPE 2: Auto-Sync après modification de réservation
+          const autoSyncResult = await syncService.performAutoSyncAfterChange('reservation');
+          
+          // Notification discrète seulement en cas d'échec
+          if (!autoSyncResult.success) {
+            showNotification(autoSyncResult.message, 'warning');
+          } else if (autoSyncResult.action === 'upload') {
+            // Notification très discrète de succès (optionnel)
+            console.log('✅ Auto-sync réservations:', autoSyncResult.message);
+          }
+          
         } catch (error) {
           console.error('Erreur sauvegarde réservations:', error);
         }
@@ -3882,10 +3894,22 @@ const AuthenticatedApp: React.FC = () => {
 
   useEffect(() => {
     if (vehicles.length > 0) {
-      // Sauvegarder avec Supabase + localStorage
+      // Sauvegarder avec Supabase + localStorage + Auto-Sync
       const saveVehicles = async () => {
         try {
           await supabaseService.saveVehicles(vehicles);
+          
+          // 🚀 ÉTAPE 2: Auto-Sync après modification de véhicule
+          const autoSyncResult = await syncService.performAutoSyncAfterChange('vehicle');
+          
+          // Notification discrète seulement en cas d'échec
+          if (!autoSyncResult.success) {
+            showNotification(autoSyncResult.message, 'warning');
+          } else if (autoSyncResult.action === 'upload') {
+            // Notification très discrète de succès (optionnel)
+            console.log('✅ Auto-sync véhicules:', autoSyncResult.message);
+          }
+          
         } catch (error) {
           console.error('Erreur sauvegarde véhicules:', error);
         }

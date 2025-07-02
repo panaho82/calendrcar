@@ -54,6 +54,66 @@ class SyncService {
     localStorage.setItem(this.autoSyncEnabledKey, enabled.toString());
   }
 
+  // Auto-sync après modification (avec retry)
+  async performAutoSyncAfterChange(changeType: 'reservation' | 'vehicle'): Promise<AutoSyncResult> {
+    try {
+      // Vérifier si auto-sync est activée
+      if (!this.isAutoSyncEnabled()) {
+        return { success: true, message: 'Auto-sync désactivée', action: 'none' };
+      }
+
+      // Vérifier si Supabase est disponible
+      if (!supabaseService.isSupabaseEnabled()) {
+        return { success: true, message: 'Mode hors ligne', action: 'none' };
+      }
+
+      // Tentative de sync avec retry
+      const maxRetries = 2;
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await this.silentUpload();
+          
+          if (result.success) {
+            return {
+              success: true,
+              message: `${changeType === 'reservation' ? '📅' : '🚗'} Synchronisé automatiquement`,
+              action: 'upload',
+              details: {
+                reservationsUploaded: this.getLocalReservations().length,
+                vehiclesUploaded: this.getLocalVehicles().length
+              }
+            };
+          } else {
+            lastError = result.message;
+          }
+        } catch (error) {
+          lastError = error;
+          // Attendre avant retry (sauf au dernier essai)
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
+        }
+      }
+
+      // Tous les essais ont échoué
+      return {
+        success: false,
+        message: `Sync échouée après ${maxRetries} tentatives`,
+        action: 'none'
+      };
+
+    } catch (error) {
+      console.error('Erreur auto-sync après modification:', error);
+      return {
+        success: false,
+        message: `Erreur auto-sync: ${error}`,
+        action: 'none'
+      };
+    }
+  }
+
   // Auto-sync intelligente à l'ouverture
   async performAutoSync(): Promise<AutoSyncResult> {
     try {

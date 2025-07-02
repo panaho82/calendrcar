@@ -219,14 +219,14 @@ const SyncPanel: React.FC<SyncPanelProps> = ({ isDarkMode, isOpen, onClose, show
               <div className={`p-4 rounded-lg flex items-center justify-between ${
                 isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
               }`}>
-                <div>
-                  <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Synchronisation Automatique
-                  </h4>
-                  <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                    Sync automatique à l'ouverture de l'app
-                  </p>
-                </div>
+                                 <div>
+                   <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                     Synchronisation Automatique
+                   </h4>
+                   <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                     Sync à l'ouverture + après chaque modification
+                   </p>
+                 </div>
                 <button
                   onClick={handleToggleAutoSync}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
