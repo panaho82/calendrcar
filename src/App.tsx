@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { supabaseService } from './services/supabaseService.ts';
 import { 
   Calendar, 
   Clock, 
@@ -3759,52 +3760,101 @@ const AuthenticatedApp: React.FC = () => {
   // const notificationScheduler = useNotificationScheduler(reservations, vehicles);
 
   useEffect(() => {
-    // Chargement des réservations
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try {
-          const parsedData = JSON.parse(saved);
-          const convertedData = parsedData.map((item: any) => ({
-            ...item,
-            startTime: new Date(item.startTime),
-            endTime: new Date(item.endTime)
-          }));
-          setReservations(convertedData);
-        } catch {
-          setReservations(EXAMPLE_RESERVATIONS);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(EXAMPLE_RESERVATIONS));
-        }
-      } else {
-      // Première visite - charger les données d'exemple
-        setReservations(EXAMPLE_RESERVATIONS);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(EXAMPLE_RESERVATIONS));
-      }
-
-    // Chargement des véhicules
-    const savedVehicles = localStorage.getItem(VEHICLES_STORAGE_KEY);
-    if (savedVehicles) {
+    // Chargement initial des données avec Supabase + localStorage
+    const loadInitialData = async () => {
       try {
-        const parsedVehicles = JSON.parse(savedVehicles);
-        setVehicles(parsedVehicles);
-      } catch {
-        setVehicles(INITIAL_VEHICLES);
-        localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(INITIAL_VEHICLES));
+        // Charger les réservations
+        const loadedReservations = await supabaseService.getReservations();
+        if (loadedReservations.length > 0) {
+          setReservations(loadedReservations);
+          showNotification(`${loadedReservations.length} réservations synchronisées`, 'success');
+        } else {
+          // Aucune donnée en base, charger les exemples
+          setReservations(EXAMPLE_RESERVATIONS);
+          await supabaseService.saveReservations(EXAMPLE_RESERVATIONS);
+          showNotification('Données d\'exemple chargées', 'info');
+        }
+
+        // Charger les véhicules
+        const loadedVehicles = await supabaseService.getVehicles();
+        if (loadedVehicles.length > 0) {
+          setVehicles(loadedVehicles);
+        } else {
+          // Aucun véhicule en base, charger les exemples
+          setVehicles(INITIAL_VEHICLES);
+          await supabaseService.saveVehicles(INITIAL_VEHICLES);
+        }
+
+        // Indiquer si Supabase est actif
+        if (supabaseService.isSupabaseEnabled()) {
+          console.log('🟢 Synchronisation Supabase active');
+        } else {
+          console.log('🟡 Mode localStorage uniquement');
+        }
+
+      } catch (error) {
+        console.error('Erreur chargement initial:', error);
+        showNotification('Erreur de chargement, utilisation des données locales', 'warning');
+        
+        // Fallback sur localStorage en cas d'erreur
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          try {
+            const parsedData = JSON.parse(saved);
+            const convertedData = parsedData.map((item: any) => ({
+              ...item,
+              startTime: new Date(item.startTime),
+              endTime: new Date(item.endTime)
+            }));
+            setReservations(convertedData);
+          } catch {
+            setReservations(EXAMPLE_RESERVATIONS);
+          }
+        } else {
+          setReservations(EXAMPLE_RESERVATIONS);
+        }
+
+        const savedVehicles = localStorage.getItem(VEHICLES_STORAGE_KEY);
+        if (savedVehicles) {
+          try {
+            setVehicles(JSON.parse(savedVehicles));
+          } catch {
+            setVehicles(INITIAL_VEHICLES);
+          }
+        } else {
+          setVehicles(INITIAL_VEHICLES);
+        }
       }
-    } else {
-      setVehicles(INITIAL_VEHICLES);
-      localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(INITIAL_VEHICLES));
-    }
+    };
+
+    loadInitialData();
   }, []);
 
   useEffect(() => {
     if (reservations.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(reservations));
+      // Sauvegarder avec Supabase + localStorage
+      const saveReservations = async () => {
+        try {
+          await supabaseService.saveReservations(reservations);
+        } catch (error) {
+          console.error('Erreur sauvegarde réservations:', error);
+        }
+      };
+      saveReservations();
     }
   }, [reservations]);
 
   useEffect(() => {
     if (vehicles.length > 0) {
-      localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(vehicles));
+      // Sauvegarder avec Supabase + localStorage
+      const saveVehicles = async () => {
+        try {
+          await supabaseService.saveVehicles(vehicles);
+        } catch (error) {
+          console.error('Erreur sauvegarde véhicules:', error);
+        }
+      };
+      saveVehicles();
     }
   }, [vehicles]);
 

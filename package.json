@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@supabase/supabase-js": "^2.50.2",
     "@syncfusion/ej2-react-base": "^24.2.3",
     "@syncfusion/ej2-react-schedule": "^24.2.3",
     "@testing-library/jest-dom": "^5.16.4",
