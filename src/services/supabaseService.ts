@@ -59,7 +59,7 @@ class SupabaseService {
       const { data, error } = await this.supabase
         .from('reservations')
         .select('*')
-        .order('startTime', { ascending: true });
+        .order('starttime', { ascending: true });
 
       if (error) throw error;
       
@@ -68,17 +68,17 @@ class SupabaseService {
 
       return data?.map(item => ({
         ...item,
-        startTime: new Date(item.startTime),
-        endTime: new Date(item.endTime)
+        vehicleId: item.vehicleid || item.vehicleId,
+        startTime: new Date(item.starttime || item.startTime),
+        endTime: new Date(item.endtime || item.endTime)
       })) || [];
     } catch (error) {
       console.error('❌ GET: Erreur Supabase, fallback localStorage:', error);
-      console.error('❌ GET: Détail erreur:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('❌ GET: Détail erreur:', error);
+      console.error('❌ GET: Message:', error.message);
+      console.error('❌ GET: Code:', error.code);
+      console.error('❌ GET: Details:', error.details);
+      console.error('❌ GET: Hint:', error.hint);
       return this.getReservationsFromLocalStorage();
     }
   }
@@ -103,8 +103,9 @@ class SupabaseService {
       // Insérer les nouvelles réservations avec conversion de dates sécurisée
       const formattedData = reservations.map(r => ({
         ...r,
-        startTime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
-        endTime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString()
+        vehicleid: r.vehicleId,
+        starttime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
+        endtime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString()
       }));
       
       console.log('📝 SAVE: Données formatées:', formattedData);
