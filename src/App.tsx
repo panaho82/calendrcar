@@ -951,13 +951,15 @@ const Sidebar = ({
   setCurrentPage, 
   isDarkMode, 
   onToggleTheme,
-  showNotification 
+  showNotification,
+  syncStatus = 'synced'
 }: { 
   currentPage: string, 
   setCurrentPage: (page: string) => void,
   isDarkMode: boolean,
   onToggleTheme: () => void,
-  showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void
+  showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void,
+  syncStatus?: 'synced' | 'syncing' | 'error' | 'offline'
 }) => {
   const { logout, username } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1049,12 +1051,19 @@ const Sidebar = ({
 
         <button 
           onClick={() => setIsSyncPanelOpen(true)}
-          className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700"
+          className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700 relative"
         >
           <Cloud className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />
           <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             Synchronisation
           </span>
+          {/* Indicateur de statut de sync */}
+          <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
+            syncStatus === 'synced' ? 'bg-green-500' :
+            syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' :
+            syncStatus === 'error' ? 'bg-red-500' :
+            'bg-gray-500'
+          }`}></div>
         </button>
 
         <button 
@@ -3764,6 +3773,9 @@ const AuthenticatedApp: React.FC = () => {
     isVisible: false
   });
 
+  // État du statut de synchronisation
+  const [lastSyncStatus, setLastSyncStatus] = useState<'synced' | 'syncing' | 'error' | 'offline'>('synced');
+
   // Fonction pour afficher une notification
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
     setNotification({
@@ -3786,18 +3798,40 @@ const AuthenticatedApp: React.FC = () => {
     const loadInitialData = async () => {
       try {
         // 🚀 ÉTAPE 1: Auto-Sync à l'ouverture
+        setLastSyncStatus('syncing');
         const autoSyncResult = await syncService.performAutoSync();
         
-        // Afficher le résultat de l'auto-sync
-        if (autoSyncResult.success && autoSyncResult.action !== 'none') {
+        // Afficher le résultat de l'auto-sync avec plus de détails
+        if (autoSyncResult.success) {
           const actionEmoji = {
             'upload': '📤',
             'download': '📥',
-            'conflict': '⚠️'
+            'conflict': '⚠️',
+            'none': '🔄'
           }[autoSyncResult.action] || '🔄';
           
-          showNotification(`${actionEmoji} ${autoSyncResult.message}`, 
-            autoSyncResult.action === 'conflict' ? 'warning' : 'success');
+          // Toujours afficher une notification d'auto-sync (même si 'none')
+          if (autoSyncResult.action === 'none') {
+            if (autoSyncResult.message.includes('désactivée')) {
+              showNotification('🔒 Auto-sync désactivée', 'info');
+            } else if (autoSyncResult.message.includes('hors ligne')) {
+              showNotification('📴 Mode hors ligne détecté', 'info');
+            } else {
+              showNotification('✅ Données déjà synchronisées', 'success');
+            }
+          } else {
+            showNotification(`${actionEmoji} ${autoSyncResult.message}`, 
+              autoSyncResult.action === 'conflict' ? 'warning' : 'success');
+          }
+        } else {
+          // Erreur d'auto-sync
+          setLastSyncStatus('error');
+          showNotification(`❌ ${autoSyncResult.message}`, 'error');
+        }
+
+        // Mettre à jour le statut final
+        if (autoSyncResult.success) {
+          setLastSyncStatus('synced');
         }
 
         // 🚀 ÉTAPE 2: Charger les données (maintenant synchronisées)
@@ -3830,6 +3864,7 @@ const AuthenticatedApp: React.FC = () => {
 
       } catch (error) {
         console.error('Erreur chargement initial:', error);
+        setLastSyncStatus('error');
         showNotification('Erreur de chargement, utilisation des données locales', 'warning');
         
         // Fallback sur localStorage en cas d'erreur
@@ -3948,6 +3983,7 @@ const AuthenticatedApp: React.FC = () => {
         isDarkMode={isDarkMode}
         onToggleTheme={toggleTheme}
         showNotification={showNotification}
+        syncStatus={lastSyncStatus}
       />
       
       {/* Contenu principal */}
