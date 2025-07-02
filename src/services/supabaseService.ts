@@ -32,7 +32,7 @@ class SupabaseService {
   constructor() {
     // Configuration Supabase
     try {
-      this.supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey);
+      this.supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey, supabaseConfig.options);
       this.isEnabled = true;
       console.log('🟢 Supabase connecté à:', supabaseConfig.url);
       

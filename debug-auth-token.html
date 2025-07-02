@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Auth Token - CalendrCar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnostic Auth Token - CalendrCar</h1>
+    <div id="results"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0MTU4MTksImV4cCI6MjA2Njk5MTgxOX0.t_HWBYsUK-qJrU-GjQ314Irr1DsiArbci0i7xXen9DM';
+
+        const results = document.getElementById('results');
+
+        function addResult(type, title, content) {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${title}</strong><br>${content}`;
+            results.appendChild(div);
+        }
+
+        async function testSupabaseAuth() {
+            try {
+                addResult('info', '🔧 Initialisation', 'Création du client Supabase...');
+                
+                const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        persistSession: false
+                    }
+                });
+                
+                addResult('success', '✅ Client créé', 'Client Supabase initialisé avec succès');
+
+                // Test 1: Vérifier la session actuelle
+                addResult('info', '🔍 Test 1', 'Vérification de la session...');
+                const { data: session, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    addResult('error', '❌ Erreur session', sessionError.message);
+                } else {
+                    addResult('info', '📋 Session', session ? 'Session active' : 'Aucune session');
+                }
+
+                // Test 2: Tentative de lecture des véhicules
+                addResult('info', '🔍 Test 2', 'Tentative de lecture des véhicules...');
+                const { data: vehicles, error: vehiclesError } = await supabase
+                    .from('vehicles')
+                    .select('*')
+                    .limit(1);
+
+                if (vehiclesError) {
+                    addResult('error', '❌ Erreur véhicules', `
+                        Message: ${vehiclesError.message}<br>
+                        Code: ${vehiclesError.code}<br>
+                        Details: ${vehiclesError.details}<br>
+                        Hint: ${vehiclesError.hint}
+                    `);
+                } else {
+                    addResult('success', '✅ Véhicules OK', `${vehicles?.length || 0} véhicules trouvés`);
+                }
+
+                // Test 3: Tentative de lecture des réservations
+                addResult('info', '🔍 Test 3', 'Tentative de lecture des réservations...');
+                const { data: reservations, error: reservationsError } = await supabase
+                    .from('reservations')
+                    .select('*')
+                    .limit(1);
+
+                if (reservationsError) {
+                    addResult('error', '❌ Erreur réservations', `
+                        Message: ${reservationsError.message}<br>
+                        Code: ${reservationsError.code}<br>
+                        Details: ${reservationsError.details}<br>
+                        Hint: ${reservationsError.hint}
+                    `);
+                } else {
+                    addResult('success', '✅ Réservations OK', `${reservations?.length || 0} réservations trouvées`);
+                }
+
+                // Test 4: Test d'authentification anonyme
+                addResult('info', '🔍 Test 4', 'Test auth anonyme...');
+                const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+                
+                if (authError) {
+                    addResult('error', '❌ Auth anonyme échouée', authError.message);
+                } else {
+                    addResult('success', '✅ Auth anonyme OK', 'Connexion anonyme réussie');
+                    
+                    // Retry lectures après auth
+                    addResult('info', '🔍 Test 4b', 'Nouvelle tentative de lecture après auth...');
+                    const { data: vehiclesAuth, error: vehiclesAuthError } = await supabase
+                        .from('vehicles')
+                        .select('*')
+                        .limit(1);
+
+                    if (vehiclesAuthError) {
+                        addResult('error', '❌ Véhicules après auth', vehiclesAuthError.message);
+                    } else {
+                        addResult('success', '✅ Véhicules après auth OK', `${vehiclesAuth?.length || 0} véhicules`);
+                    }
+                }
+
+            } catch (error) {
+                addResult('error', '💥 Erreur critique', error.message);
+                console.error('Erreur:', error);
+            }
+        }
+
+        // Lancer les tests
+        window.addEventListener('load', testSupabaseAuth);
+    </script>
+</body>
+</html> 

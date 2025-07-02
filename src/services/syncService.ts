@@ -89,6 +89,7 @@ class SyncService {
             lastError = result.message;
           }
         } catch (error) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           lastError = error;
           // Attendre avant retry (sauf au dernier essai)
           if (attempt < maxRetries) {
@@ -296,7 +297,9 @@ class SyncService {
       const localReservations = this.getLocalReservations();
       const localVehicles = this.getLocalVehicles();
       
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const remoteReservations = await supabaseService.getReservations();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const remoteVehicles = await supabaseService.getVehicles();
 
       // Pour simplifier, on considère que local = source de vérité

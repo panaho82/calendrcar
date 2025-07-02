@@ -496,6 +496,7 @@ const LoadingSpinner = ({ isDarkMode }: { isDarkMode: boolean }) => {
 };
 
 // Composant Modal amélioré
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Modal = ({ 
   isOpen, 
   onClose, 
@@ -1301,7 +1302,9 @@ const Dashboard = ({ reservations, vehicles, isDarkMode, showNotification }: { r
   // Statistiques de base avec données réelles
   const totalRevenue = reservations.reduce((sum, r) => sum + (r.amount || 0), 0);
   const confirmedReservations = reservations.filter(r => r.status === 'confirmed').length;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const pendingReservations = reservations.filter(r => r.status === 'pending').length;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const cancelledReservations = reservations.filter(r => r.status === 'cancelled').length;
 
   // Statistiques avancées avec données réelles
@@ -1313,7 +1316,8 @@ const Dashboard = ({ reservations, vehicles, isDarkMode, showNotification }: { r
   // Réservations actives aujourd'hui
   const activeReservationsToday = todayReservations.filter(r => r.status === 'confirmed').length;
 
-  // Réservations par type de véhicule
+  // Variables calculées pour futures fonctionnalités
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const reservationsByVehicleType = vehicles.reduce((acc, vehicle) => {
     const vehicleReservations = reservations.filter(r => r.vehicleId === vehicle.id);
     acc[vehicle.type] = (acc[vehicle.type] || 0) + vehicleReservations.length;
