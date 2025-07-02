@@ -14,10 +14,13 @@ const SyncPanel: React.FC<SyncPanelProps> = ({ isDarkMode, isOpen, onClose, show
   const [isLoading, setIsLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [preview, setPreview] = useState<any>(null);
+  const [isAutoSyncEnabled, setIsAutoSyncEnabled] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       loadSyncStatus();
+      // Charger l'état de l'auto-sync
+      setIsAutoSyncEnabled(syncService.isAutoSyncEnabled());
     }
   }, [isOpen]);
 
@@ -86,6 +89,16 @@ const SyncPanel: React.FC<SyncPanelProps> = ({ isDarkMode, isOpen, onClose, show
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleToggleAutoSync = () => {
+    const newState = !isAutoSyncEnabled;
+    setIsAutoSyncEnabled(newState);
+    syncService.setAutoSyncEnabled(newState);
+    showNotification(
+      newState ? 'Auto-sync activée' : 'Auto-sync désactivée', 
+      'info'
+    );
   };
 
   if (!isOpen) return null;
@@ -201,6 +214,34 @@ const SyncPanel: React.FC<SyncPanelProps> = ({ isDarkMode, isOpen, onClose, show
                   </div>
                 </div>
               )}
+
+              {/* Toggle Auto-Sync */}
+              <div className={`p-4 rounded-lg flex items-center justify-between ${
+                isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+              }`}>
+                <div>
+                  <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Synchronisation Automatique
+                  </h4>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Sync automatique à l'ouverture de l'app
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggleAutoSync}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isAutoSyncEnabled 
+                      ? 'bg-blue-600' 
+                      : isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isAutoSyncEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
 
               {/* Actions */}
               <div className="flex space-x-3">

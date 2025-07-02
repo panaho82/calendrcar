@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabaseService } from './services/supabaseService.ts';
+import { syncService } from './services/syncService.ts';
 import SyncPanel from './components/SyncPanel.tsx';
 import { 
   Calendar, 
@@ -3781,19 +3782,33 @@ const AuthenticatedApp: React.FC = () => {
   // const notificationScheduler = useNotificationScheduler(reservations, vehicles);
 
   useEffect(() => {
-    // Chargement initial des données avec Supabase + localStorage
+    // Chargement initial avec Auto-Sync intelligente
     const loadInitialData = async () => {
       try {
-        // Charger les réservations
+        // 🚀 ÉTAPE 1: Auto-Sync à l'ouverture
+        const autoSyncResult = await syncService.performAutoSync();
+        
+        // Afficher le résultat de l'auto-sync
+        if (autoSyncResult.success && autoSyncResult.action !== 'none') {
+          const actionEmoji = {
+            'upload': '📤',
+            'download': '📥',
+            'conflict': '⚠️'
+          }[autoSyncResult.action] || '🔄';
+          
+          showNotification(`${actionEmoji} ${autoSyncResult.message}`, 
+            autoSyncResult.action === 'conflict' ? 'warning' : 'success');
+        }
+
+        // 🚀 ÉTAPE 2: Charger les données (maintenant synchronisées)
         const loadedReservations = await supabaseService.getReservations();
         if (loadedReservations.length > 0) {
           setReservations(loadedReservations);
-          showNotification(`${loadedReservations.length} réservations synchronisées`, 'success');
         } else {
           // Aucune donnée en base, charger les exemples
           setReservations(EXAMPLE_RESERVATIONS);
           await supabaseService.saveReservations(EXAMPLE_RESERVATIONS);
-          showNotification('Données d\'exemple chargées', 'info');
+          showNotification('Données d\'exemple initialisées', 'info');
         }
 
         // Charger les véhicules
@@ -3806,9 +3821,9 @@ const AuthenticatedApp: React.FC = () => {
           await supabaseService.saveVehicles(INITIAL_VEHICLES);
         }
 
-        // Indiquer si Supabase est actif
+        // Indiquer le statut de synchronisation
         if (supabaseService.isSupabaseEnabled()) {
-          console.log('🟢 Synchronisation Supabase active');
+          console.log('🟢 Auto-Sync activée - Synchronisation Supabase active');
         } else {
           console.log('🟡 Mode localStorage uniquement');
         }
