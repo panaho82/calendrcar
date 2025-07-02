@@ -102,10 +102,16 @@ class SupabaseService {
       console.log('📝 SAVE: Insertion nouvelles réservations...');
       // Insérer les nouvelles réservations avec conversion de dates sécurisée
       const formattedData = reservations.map(r => ({
-        ...r,
-        vehicleid: r.vehicleId,
+        id: r.id,
+        title: r.title,
+        client: r.client,
+        phone: r.phone,
+        vehicleid: r.vehicleId,  // Utiliser le nom de colonne Supabase
         starttime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
-        endtime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString()
+        endtime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString(),
+        status: r.status,
+        notes: r.notes || '',
+        amount: r.amount || 0
       }));
       
       console.log('📝 SAVE: Données formatées:', formattedData);
@@ -159,7 +165,13 @@ class SupabaseService {
 
     try {
       // Supprimer tous les véhicules existants
-      await this.supabase.from('vehicles').delete().neq('id', '');
+      const { error: deleteError } = await this.supabase.from('vehicles').delete().neq('id', '');
+      if (deleteError) {
+        console.warn('⚠️ Erreur suppression véhicules:', deleteError);
+      }
+
+      // Attendre un peu pour que la suppression soit effective
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Insérer les nouveaux véhicules
       const { error } = await this.supabase

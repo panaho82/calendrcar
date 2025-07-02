@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚀 Vérification Déploiement Netlify - CalendrCar</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 5px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #555; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        .version-info { background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 12px; }
+        .app-link { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px; }
+        .app-link:hover { background: #0056b3; color: white; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Vérification Déploiement Netlify</h1>
+        
+        <div class="status success">
+            <strong>✅ MODIFICATIONS POUSSÉES !</strong><br>
+            Commit 7bcf44a poussé sur GitHub avec toutes les corrections.<br>
+            Netlify devrait déployer automatiquement dans 1-5 minutes.
+        </div>
+
+        <h2>🌐 Liens d'Accès</h2>
+        <div>
+            <a href="https://mm-calendrcar.netlify.app/" target="_blank" class="app-link">
+                📱 App Netlify Production
+            </a>
+            <a href="http://localhost:3001" target="_blank" class="app-link">
+                💻 App Locale (Test)
+            </a>
+        </div>
+
+        <div class="status info">
+            <strong>🎯 CHECKLIST DE VALIDATION :</strong><br><br>
+            
+            <strong>1. ✅ Popup Supprimé :</strong><br>
+            • Plus de "données d'exemple initialisées" au chargement<br><br>
+            
+            <strong>2. ✅ Persistence Réservations :</strong><br>
+            • Créer une réservation → Actualiser (F5) → Vérifier qu'elle persiste<br><br>
+            
+            <strong>3. ✅ Synchronisation PC ↔ Mobile :</strong><br>
+            • Créer réservation sur PC → Ouvrir sur mobile → Doit apparaître<br><br>
+            
+            <strong>4. ✅ Véhicules Corrects :</strong><br>
+            • 13 véhicules CalendrCar (2x Peugeot 208, Mitsubishi L200, etc.)<br><br>
+            
+            <strong>🔧 Si problèmes :</strong><br>
+            • Utiliser <a href="./clear-cache.html">clear-cache.html</a><br>
+            • Utiliser <a href="./test-reservation-persistence.html">test-reservation-persistence.html</a>
+        </div>
+        
+        <div class="status warning">
+            <strong>⏱️ ATTENDRE 1-5 MINUTES</strong><br>
+            Netlify met quelques minutes à déployer après le push GitHub.<br>
+            Rafraîchissez l'app Netlify pour voir les changements.
+        </div>
+    </div>
+</body>
+</html> 
