@@ -953,14 +953,16 @@ const Sidebar = ({
   isDarkMode, 
   onToggleTheme,
   showNotification,
-  syncStatus = 'synced'
+  syncStatus = 'synced',
+  realtimeSyncActive = false
 }: { 
   currentPage: string, 
   setCurrentPage: (page: string) => void,
   isDarkMode: boolean,
   onToggleTheme: () => void,
   showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void,
-  syncStatus?: 'synced' | 'syncing' | 'error' | 'offline'
+  syncStatus?: 'synced' | 'syncing' | 'error' | 'offline',
+  realtimeSyncActive?: boolean
 }) => {
   const { logout, username } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1053,15 +1055,20 @@ const Sidebar = ({
         <button 
           onClick={() => setIsSyncPanelOpen(true)}
           className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700 relative"
+          title={realtimeSyncActive ? 'Synchronisation temps réel active' : 'Synchronisation manuelle'}
         >
-          <Cloud className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />
+          <Cloud className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'} ${realtimeSyncActive ? 'text-blue-400' : ''}`} />
           <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
             Synchronisation
+            {realtimeSyncActive && isExpanded && (
+              <span className="block text-xs text-blue-400">Temps réel actif</span>
+            )}
           </span>
           {/* Indicateur de statut de sync */}
           <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
+            realtimeSyncActive && syncStatus === 'synced' ? 'bg-blue-500 animate-pulse' :
             syncStatus === 'synced' ? 'bg-green-500' :
-            syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' :
+            syncStatus === 'syncing' ? 'bg-yellow-500 animate-pulse' :
             syncStatus === 'error' ? 'bg-red-500' :
             'bg-gray-500'
           }`}></div>
@@ -3779,6 +3786,7 @@ const AuthenticatedApp: React.FC = () => {
 
   // État du statut de synchronisation
   const [lastSyncStatus, setLastSyncStatus] = useState<'synced' | 'syncing' | 'error' | 'offline'>('synced');
+  const [realtimeSyncActive, setRealtimeSyncActive] = useState(false);
 
   // Fonction pour afficher une notification
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -3892,6 +3900,30 @@ const AuthenticatedApp: React.FC = () => {
         // Indiquer le statut de synchronisation
         if (supabaseService.isSupabaseEnabled()) {
           console.log('🟢 Auto-Sync activée - Synchronisation Supabase active');
+          
+          // 🚀 DÉMARRER LA SYNCHRONISATION TEMPS RÉEL
+          setRealtimeSyncActive(true);
+          syncService.startBackgroundSync((newData) => {
+            console.log('🔄 Nouvelles données reçues via sync temps réel');
+            
+            // Mettre à jour les états avec les nouvelles données
+            if (newData.reservations) {
+              const convertedReservations = newData.reservations.map((item: any) => ({
+                ...item,
+                vehicleId: item.vehicleid || item.vehicleId,
+                startTime: new Date(item.starttime || item.startTime),
+                endTime: new Date(item.endtime || item.endTime)
+              }));
+              setReservations(convertedReservations);
+            }
+            
+            if (newData.vehicles) {
+              setVehicles(newData.vehicles);
+            }
+            
+            // Notification discrète
+            showNotification('🔄 Données synchronisées automatiquement', 'info');
+          });
         } else {
           console.log('🟡 Mode localStorage uniquement');
         }
@@ -3933,6 +3965,12 @@ const AuthenticatedApp: React.FC = () => {
     };
 
     loadInitialData();
+    
+    // Nettoyage au démontage du composant
+    return () => {
+      syncService.stopBackgroundSync();
+      setRealtimeSyncActive(false);
+    };
   }, []);
 
   useEffect(() => {
@@ -4021,6 +4059,7 @@ const AuthenticatedApp: React.FC = () => {
         onToggleTheme={toggleTheme}
         showNotification={showNotification}
         syncStatus={lastSyncStatus}
+        realtimeSyncActive={realtimeSyncActive}
       />
       
       {/* Contenu principal */}

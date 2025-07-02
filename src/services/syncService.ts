@@ -40,6 +40,8 @@ interface AutoSyncResult {
 class SyncService {
   private lastSyncKey = 'calendrcar-last-sync';
   private autoSyncEnabledKey = 'calendrcar-auto-sync-enabled';
+  private backgroundSyncInterval: NodeJS.Timeout | null = null;
+  private onDataChangeCallback: ((data: { reservations: any[], vehicles: any[] }) => void) | null = null;
 
   // ==================== AUTO-SYNC FUNCTIONS ====================
 
@@ -52,6 +54,101 @@ class SyncService {
   // Activer/désactiver l'auto-sync
   setAutoSyncEnabled(enabled: boolean): void {
     localStorage.setItem(this.autoSyncEnabledKey, enabled.toString());
+  }
+
+  // ==================== SYNC TEMPS RÉEL ====================
+
+  // Démarrer la synchronisation en arrière-plan
+  startBackgroundSync(onDataChange?: (data: { reservations: any[], vehicles: any[] }) => void): void {
+    this.onDataChangeCallback = onDataChange || null;
+    
+    if (this.backgroundSyncInterval) {
+      this.stopBackgroundSync();
+    }
+    
+    console.log('🔄 Démarrage sync en arrière-plan (10s)');
+    
+    this.backgroundSyncInterval = setInterval(async () => {
+      if (this.isAutoSyncEnabled() && supabaseService.isSupabaseEnabled()) {
+        await this.performBackgroundSync();
+      }
+    }, 10000); // Toutes les 10 secondes
+  }
+
+  // Arrêter la synchronisation en arrière-plan
+  stopBackgroundSync(): void {
+    if (this.backgroundSyncInterval) {
+      clearInterval(this.backgroundSyncInterval);
+      this.backgroundSyncInterval = null;
+      console.log('🛑 Arrêt sync en arrière-plan');
+    }
+  }
+
+  // Synchronisation silencieuse en arrière-plan
+  private async performBackgroundSync(): Promise<void> {
+    try {
+      // Récupérer les données distantes
+      const remoteReservations = await supabaseService.getReservations();
+      const remoteVehicles = await supabaseService.getVehicles();
+      
+      // Récupérer les données locales
+      const localReservations = this.getLocalReservations();
+      const localVehicles = this.getLocalVehicles();
+      
+      // Comparer les données
+      const reservationsChanged = this.hasDataChanged(localReservations, remoteReservations, 'reservations');
+      const vehiclesChanged = this.hasDataChanged(localVehicles, remoteVehicles, 'vehicles');
+      
+      if (reservationsChanged || vehiclesChanged) {
+        console.log('🔄 Changements détectés, mise à jour des données locales');
+        
+        // Mettre à jour localStorage avec les données distantes
+        localStorage.setItem('calendrcar-reservations', JSON.stringify(remoteReservations));
+        localStorage.setItem('calendrcar-vehicles', JSON.stringify(remoteVehicles));
+        localStorage.setItem(this.lastSyncKey, new Date().toISOString());
+        
+        // Notifier l'app des changements
+        if (this.onDataChangeCallback) {
+          this.onDataChangeCallback({
+            reservations: remoteReservations,
+            vehicles: remoteVehicles
+          });
+        }
+        
+        console.log('✅ Données synchronisées automatiquement');
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur sync arrière-plan:', error);
+    }
+  }
+
+  // Vérifier si les données ont changé
+  private hasDataChanged(localData: any[], remoteData: any[], type: 'reservations' | 'vehicles'): boolean {
+    if (localData.length !== remoteData.length) {
+      return true;
+    }
+    
+    // Comparaison simple par ID et timestamp
+    const localIds = localData.map(item => item.id).sort();
+    const remoteIds = remoteData.map(item => item.id).sort();
+    
+    if (JSON.stringify(localIds) !== JSON.stringify(remoteIds)) {
+      return true;
+    }
+    
+    // Pour les réservations, vérifier aussi les dates de modification
+    if (type === 'reservations') {
+      const localTimestamps = localData.map(item => 
+        item.startTime ? new Date(item.startTime).getTime() : 0
+      ).sort();
+      const remoteTimestamps = remoteData.map(item => 
+        item.starttime ? new Date(item.starttime).getTime() : 0
+      ).sort();
+      
+      return JSON.stringify(localTimestamps) !== JSON.stringify(remoteTimestamps);
+    }
+    
+    return false;
   }
 
   // Auto-sync après modification (avec retry)
@@ -89,7 +186,6 @@ class SyncService {
             lastError = result.message;
           }
         } catch (error) {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           lastError = error;
           // Attendre avant retry (sauf au dernier essai)
           if (attempt < maxRetries) {
@@ -99,6 +195,7 @@ class SyncService {
       }
 
       // Tous les essais ont échoué
+      console.warn('Auto-sync échouée après tentatives, dernière erreur:', lastError);
       return {
         success: false,
         message: `Sync échouée après ${maxRetries} tentatives`,
@@ -109,7 +206,7 @@ class SyncService {
       console.error('Erreur auto-sync après modification:', error);
       return {
         success: false,
-        message: `Erreur auto-sync: ${error}`,
+        message: `Erreur auto-sync: ${String(error)}`,
         action: 'none'
       };
     }
@@ -184,7 +281,7 @@ class SyncService {
       console.error('Erreur auto-sync:', error);
       return { 
         success: false, 
-        message: `Erreur auto-sync: ${error}`, 
+        message: `Erreur auto-sync: ${String(error)}`, 
         action: 'none' 
       };
     }

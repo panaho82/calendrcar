@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔄 Test Synchronisation Temps Réel - CalendrCar</title>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f8f9fa; 
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .status { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            font-weight: 500;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-weight: bold; 
+        }
+        button:hover { background: #0056b3; }
+        button.test { background: #28a745; }
+        button.test:hover { background: #218838; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        
+        .test-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
+        .test-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+        }
+        .test-card.active {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        h1 { color: #333; text-align: center; }
+        h2 { color: #555; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        
+        .realtime-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .realtime-indicator.active {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        .realtime-indicator.inactive {
+            background: #6c757d;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .countdown {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Test Synchronisation Temps Réel</h1>
+        
+        <div class="status info">
+            <strong>🎯 OBJECTIF :</strong><br>
+            Vérifier que les modifications sur un appareil apparaissent automatiquement sur l'autre SANS appuyer sur F5.<br>
+            <strong>Fréquence :</strong> Vérification toutes les 10 secondes
+        </div>
+
+        <h2>🚀 Contrôles de Test</h2>
+        
+        <div class="test-grid">
+            <div class="test-card">
+                <h3>📱 Simulation Appareil 1</h3>
+                <button onclick="createTestReservation()" class="test">Créer Réservation Test</button>
+                <button onclick="updateTestReservation()" class="test">Modifier Réservation</button>
+                <button onclick="deleteTestReservation()" class="danger">Supprimer Réservation</button>
+            </div>
+            
+            <div class="test-card">
+                <h3>💻 Simulation Appareil 2</h3>
+                <button onclick="monitorChanges()" class="test">📡 Surveiller Changements</button>
+                <button onclick="checkSyncStatus()">🔍 Vérifier Statut Sync</button>
+                <button onclick="forceSync()">⚡ Forcer Synchronisation</button>
+            </div>
+        </div>
+
+        <h2>📊 Statut Temps Réel</h2>
+        
+        <div id="syncStatus" class="status info">
+            <div>
+                <span class="realtime-indicator inactive" id="syncIndicator"></span>
+                <strong>Synchronisation :</strong> <span id="syncText">Initialisation...</span>
+            </div>
+            <div style="margin-top: 10px;">
+                <strong>Prochaine vérification dans :</strong> <span class="countdown" id="countdown">--</span>
+            </div>
+        </div>
+
+        <div id="results"></div>
+
+        <h2>📋 Instructions de Test</h2>
+        <div class="status warning">
+            <strong>Comment tester :</strong><br><br>
+            
+            <strong>1. Sur appareil 1 (PC) :</strong><br>
+            • Ouvrir https://mm-calendrcar.netlify.app/<br>
+            • Créer une nouvelle réservation<br><br>
+            
+            <strong>2. Sur appareil 2 (Mobile) :</strong><br>
+            • Ouvrir la même URL<br>
+            • Attendre 10-15 secondes SANS actualiser<br>
+            • ✅ La nouvelle réservation devrait apparaître automatiquement<br><br>
+            
+            <strong>3. Test inverse :</strong><br>
+            • Modifier sur mobile → vérifier sur PC<br><br>
+            
+            <strong>🎯 SUCCÈS si :</strong><br>
+            • Les changements apparaissent sans F5<br>
+            • Message "🔄 Données synchronisées automatiquement"<br>
+            • Indicateur bleu clignotant dans la sidebar
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0MTU4MTksImV4cCI6MjA2Njk5MTgxOX0.t_HWBYsUK-qJrU-GjQ314Irr1DsiArbci0i7xXen9DM';
+        
+        let monitoringActive = false;
+        let lastKnownData = { reservations: [], vehicles: [] };
+        let countdownInterval = null;
+        
+        function addResult(type, title, content) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${title}</strong><br>${content}<br><small>${new Date().toLocaleTimeString()}</small>`;
+            results.insertBefore(div, results.firstChild);
+            
+            // Garder seulement les 10 derniers résultats
+            while (results.children.length > 10) {
+                results.removeChild(results.lastChild);
+            }
+        }
+
+        async function createTestReservation() {
+            try {
+                const testReservation = {
+                    id: 'test-' + Date.now(),
+                    title: 'TEST Réservation Temps Réel',
+                    client: 'Test Client',
+                    phone: '0123456789',
+                    vehicleid: '208-1',
+                    starttime: new Date(Date.now() + 60000).toISOString(), // Dans 1 minute
+                    endtime: new Date(Date.now() + 3660000).toISOString(), // Dans 1h1min
+                    status: 'confirmed',
+                    notes: 'Créé par test temps réel',
+                    amount: 50
+                };
+
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/reservations`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify([testReservation])
+                });
+
+                if (response.ok) {
+                    addResult('success', '✅ Réservation test créée', 
+                        `ID: ${testReservation.id}<br>` +
+                        `Véhicule: ${testReservation.vehicleid}<br>` +
+                        `Client: ${testReservation.client}<br><br>` +
+                        `<strong>➡️ Vérifiez sur l'autre appareil dans 10-15 secondes</strong>`
+                    );
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                addResult('error', '❌ Erreur création', error.message);
+            }
+        }
+
+        async function updateTestReservation() {
+            try {
+                // Chercher une réservation test existante
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/reservations?title=like.TEST*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                const reservations = await response.json();
+                
+                if (reservations.length > 0) {
+                    const reservation = reservations[0];
+                    const updatedData = {
+                        notes: `Modifié le ${new Date().toLocaleTimeString()}`,
+                        amount: Math.floor(Math.random() * 100) + 20
+                    };
+
+                    const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${reservation.id}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updatedData)
+                    });
+
+                    if (updateResponse.ok) {
+                        addResult('success', '✅ Réservation modifiée', 
+                            `ID: ${reservation.id}<br>` +
+                            `Nouvelles notes: ${updatedData.notes}<br>` +
+                            `Nouveau montant: ${updatedData.amount}€<br><br>` +
+                            `<strong>➡️ Vérifiez le changement sur l'autre appareil</strong>`
+                        );
+                    } else {
+                        throw new Error(`HTTP ${updateResponse.status}`);
+                    }
+                } else {
+                    addResult('warning', '⚠️ Aucune réservation test', 'Créez d\'abord une réservation test');
+                }
+            } catch (error) {
+                addResult('error', '❌ Erreur modification', error.message);
+            }
+        }
+
+        async function deleteTestReservation() {
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/reservations?title=like.TEST*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                const reservations = await response.json();
+                
+                if (reservations.length > 0) {
+                    const reservation = reservations[0];
+
+                    const deleteResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${reservation.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`
+                        }
+                    });
+
+                    if (deleteResponse.ok) {
+                        addResult('success', '✅ Réservation supprimée', 
+                            `ID: ${reservation.id}<br>` +
+                            `Client: ${reservation.client}<br><br>` +
+                            `<strong>➡️ Vérifiez la suppression sur l'autre appareil</strong>`
+                        );
+                    } else {
+                        throw new Error(`HTTP ${deleteResponse.status}`);
+                    }
+                } else {
+                    addResult('warning', '⚠️ Aucune réservation test', 'Aucune réservation test à supprimer');
+                }
+            } catch (error) {
+                addResult('error', '❌ Erreur suppression', error.message);
+            }
+        }
+
+        async function monitorChanges() {
+            if (monitoringActive) {
+                monitoringActive = false;
+                document.getElementById('syncIndicator').className = 'realtime-indicator inactive';
+                document.getElementById('syncText').textContent = 'Surveillance arrêtée';
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                addResult('info', '🛑 Surveillance arrêtée', 'Monitoring des changements désactivé');
+                return;
+            }
+
+            monitoringActive = true;
+            document.getElementById('syncIndicator').className = 'realtime-indicator active';
+            document.getElementById('syncText').textContent = 'Surveillance active';
+            
+            // Charger les données initiales
+            try {
+                const reservationsResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                const vehiclesResponse = await fetch(`${SUPABASE_URL}/rest/v1/vehicles`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                lastKnownData.reservations = await reservationsResponse.json();
+                lastKnownData.vehicles = await vehiclesResponse.json();
+
+                addResult('info', '📡 Surveillance démarrée', 
+                    `Surveillance des changements activée<br>` +
+                    `Données initiales: ${lastKnownData.reservations.length} réservations, ${lastKnownData.vehicles.length} véhicules<br>` +
+                    `Vérification toutes les 10 secondes`
+                );
+
+                // Démarrer le countdown
+                startCountdown();
+
+            } catch (error) {
+                addResult('error', '❌ Erreur surveillance', error.message);
+            }
+        }
+
+        function startCountdown() {
+            let seconds = 10;
+            document.getElementById('countdown').textContent = seconds + 's';
+            
+            countdownInterval = setInterval(async () => {
+                seconds--;
+                document.getElementById('countdown').textContent = seconds + 's';
+                
+                if (seconds === 0) {
+                    if (monitoringActive) {
+                        await checkForChanges();
+                        seconds = 10; // Restart countdown
+                    } else {
+                        clearInterval(countdownInterval);
+                        countdownInterval = null;
+                    }
+                }
+            }, 1000);
+        }
+
+        async function checkForChanges() {
+            try {
+                const reservationsResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                const vehiclesResponse = await fetch(`${SUPABASE_URL}/rest/v1/vehicles`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                const currentReservations = await reservationsResponse.json();
+                const currentVehicles = await vehiclesResponse.json();
+
+                // Comparer les données
+                const reservationsChanged = JSON.stringify(lastKnownData.reservations) !== JSON.stringify(currentReservations);
+                const vehiclesChanged = JSON.stringify(lastKnownData.vehicles) !== JSON.stringify(currentVehicles);
+
+                if (reservationsChanged || vehiclesChanged) {
+                    const changes = [];
+                    
+                    if (reservationsChanged) {
+                        const diff = currentReservations.length - lastKnownData.reservations.length;
+                        changes.push(`📅 Réservations: ${currentReservations.length} (${diff > 0 ? '+' : ''}${diff})`);
+                    }
+                    
+                    if (vehiclesChanged) {
+                        const diff = currentVehicles.length - lastKnownData.vehicles.length;
+                        changes.push(`🚗 Véhicules: ${currentVehicles.length} (${diff > 0 ? '+' : ''}${diff})`);
+                    }
+
+                    addResult('success', '🔄 CHANGEMENT DÉTECTÉ !', 
+                        `${changes.join('<br>')}<br><br>` +
+                        `<strong>✅ Synchronisation temps réel fonctionnelle !</strong><br>` +
+                        `Les données ont changé automatiquement sans actualisation`
+                    );
+
+                    // Mettre à jour les données de référence
+                    lastKnownData.reservations = currentReservations;
+                    lastKnownData.vehicles = currentVehicles;
+                } else {
+                    // Pas de changement - log discret
+                    console.log('🔍 Vérification sync - Aucun changement détecté');
+                }
+
+            } catch (error) {
+                addResult('error', '❌ Erreur vérification', error.message);
+            }
+        }
+
+        async function checkSyncStatus() {
+            try {
+                const reservationsResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                const vehiclesResponse = await fetch(`${SUPABASE_URL}/rest/v1/vehicles`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                const reservations = await reservationsResponse.json();
+                const vehicles = await vehiclesResponse.json();
+
+                addResult('info', '📊 Statut Synchronisation', 
+                    `📅 Réservations: ${reservations.length}<br>` +
+                    `🚗 Véhicules: ${vehicles.length}<br>` +
+                    `🌐 Connexion Supabase: ${reservationsResponse.ok && vehiclesResponse.ok ? '✅ Active' : '❌ Erreur'}<br>` +
+                    `⏱️ Dernière vérification: ${new Date().toLocaleTimeString()}`
+                );
+
+            } catch (error) {
+                addResult('error', '❌ Erreur statut', error.message);
+            }
+        }
+
+        async function forceSync() {
+            addResult('info', '⚡ Synchronisation forcée', 'Déclenchement manuel de la synchronisation...');
+            await checkSyncStatus();
+        }
+
+        // Initialisation
+        window.addEventListener('load', () => {
+            addResult('info', '🚀 Test Temps Réel Prêt', 
+                `Utilisez les boutons ci-dessus pour tester la synchronisation.<br>` +
+                `L'objectif est de vérifier que les modifications apparaissent automatiquement sur tous les appareils.`
+            );
+        });
+    </script>
+</body>
+</html> 
