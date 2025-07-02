@@ -73,6 +73,12 @@ class SupabaseService {
       })) || [];
     } catch (error) {
       console.error('❌ GET: Erreur Supabase, fallback localStorage:', error);
+      console.error('❌ GET: Détail erreur:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       return this.getReservationsFromLocalStorage();
     }
   }
@@ -111,6 +117,12 @@ class SupabaseService {
       console.log('✅ SAVE: Réservations synchronisées avec Supabase');
     } catch (error) {
       console.error('❌ SAVE: Erreur synchronisation Supabase:', error);
+      console.error('❌ SAVE: Détail erreur:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       // Les données restent en localStorage
     }
   }
@@ -157,6 +169,12 @@ class SupabaseService {
       console.log('✅ Véhicules synchronisés avec Supabase');
     } catch (error) {
       console.warn('Erreur synchronisation Supabase:', error);
+      console.error('❌ VEHICLES: Détail erreur:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       // Les données restent en localStorage
     }
   }

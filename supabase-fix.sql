@@ -46,14 +46,6 @@ DROP POLICY IF EXISTS "Permettre tout pour reservations" ON reservations;
 CREATE POLICY "Permettre tout pour vehicles" ON vehicles FOR ALL USING (true);
 CREATE POLICY "Permettre tout pour reservations" ON reservations FOR ALL USING (true);
 
--- 7. Insérer des véhicules de test (optionnel)
-INSERT INTO vehicles (id, name, plate, type, status, color, icon) VALUES
-('peugeot-208-1', 'Peugeot 208 Allure', '9876 RB', 'car', 'available', '#3b82f6', '🚗'),
-('mitsubishi-space', 'Mitsubishi Space Star', '8765 RB', 'car', 'available', '#10b981', '🚗'),
-('kia-picanto', 'Kia Picanto', '7654 RB', 'car', 'available', '#ef4444', '🚗')
-ON CONFLICT (id) DO NOTHING;
-
--- 8. Vérification finale
+-- 7. Vérification finale
 SELECT 'Tables créées avec succès !' as status;
-SELECT 'Véhicules disponibles:' as info, count(*) as nombre FROM vehicles;
-SELECT 'Réservations existantes:' as info, count(*) as nombre FROM reservations; 
+SELECT 'Prêt pour vos données !' as info; 

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Sync CalendrCar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        button { 
+            background: #3b82f6; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        button:hover { background: #2563eb; }
+        .success { color: #059669; }
+        .error { color: #dc2626; }
+        .warning { color: #d97706; }
+        .info { color: #0369a1; }
+        .data-box { 
+            background: #f8fafc; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 5px; 
+            padding: 15px; 
+            margin: 10px 0; 
+        }
+        .data-item {
+            background: #fff;
+            border-left: 4px solid #3b82f6;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        pre { 
+            background: #1e293b; 
+            color: #e2e8f0; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto; 
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Synchronisation CalendrCar</h1>
+        
+        <div>
+            <h2>1. État des Données Supabase</h2>
+            <button onclick="checkSupabaseData()">📊 Vérifier Données Supabase</button>
+            <div id="supabaseDataResult"></div>
+        </div>
+        
+        <div>
+            <h2>2. État localStorage (Navigateur Actuel)</h2>
+            <button onclick="checkLocalStorageData()">💾 Vérifier localStorage</button>
+            <div id="localStorageResult"></div>
+        </div>
+        
+        <div>
+            <h2>3. Test Synchronisation Bidirectionnelle</h2>
+            <button onclick="testBidirectionalSync()">🔄 Test Sync Bidirectionnelle</button>
+            <div id="syncTestResult"></div>
+        </div>
+        
+        <div>
+            <h2>4. Forcer Synchronisation Complète</h2>
+            <button onclick="forceSyncFromSupabase()">⬇️ Forcer Sync Depuis Supabase</button>
+            <button onclick="forceSyncToSupabase()">⬆️ Forcer Sync Vers Supabase</button>
+            <div id="forceSyncResult"></div>
+        </div>
+
+        <div>
+            <h2>5. Nettoyer et Réinitialiser</h2>
+            <button onclick="clearLocalData()">🗑️ Vider localStorage</button>
+            <button onclick="clearSupabaseData()">🗑️ Vider Supabase</button>
+            <div id="clearResult"></div>
+        </div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        // Configuration Supabase
+        const SUPABASE_URL = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NjI0ODgsImV4cCI6MjA0OTMzODQ4OH0.VhxAn5M42LvOe_YgYxcYy3vAjHKA7lOgqJaOmCcxHDY';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `data-item ${type}`;
+            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`;
+            logsDiv.appendChild(logDiv);
+            console.log(message);
+        }
+        
+        async function checkSupabaseData() {
+            const resultDiv = document.getElementById('supabaseDataResult');
+            resultDiv.innerHTML = '<p class="info">🔄 Vérification en cours...</p>';
+            
+            try {
+                // Vérifier véhicules
+                const { data: vehicles, error: vError } = await supabase
+                    .from('vehicles')
+                    .select('*');
+                
+                // Vérifier réservations
+                const { data: reservations, error: rError } = await supabase
+                    .from('reservations')
+                    .select('*');
+
+                if (vError || rError) {
+                    throw new Error(\`Vehicles: \${vError?.message || 'OK'}, Reservations: \${rError?.message || 'OK'}\`);
+                }
+                
+                let result = '<div class="data-box">';
+                result += \`<h3>📊 Données Supabase</h3>\`;
+                result += \`<div class="data-item success">✅ Véhicules: \${vehicles?.length || 0} trouvés</div>\`;
+                result += \`<div class="data-item success">✅ Réservations: \${reservations?.length || 0} trouvées</div>\`;
+                
+                if (vehicles && vehicles.length > 0) {
+                    result += \`<h4>🚗 Véhicules:</h4>\`;
+                    vehicles.forEach(v => {
+                        result += \`<div class="data-item">\${v.name} (\${v.plate}) - \${v.status}</div>\`;
+                    });
+                }
+                
+                if (reservations && reservations.length > 0) {
+                    result += \`<h4>📅 Réservations:</h4>\`;
+                    reservations.forEach(r => {
+                        result += \`<div class="data-item">\${r.title} - \${r.client} (\${r.vehicleId}) - \${r.status}</div>\`;
+                    });
+                }
+                
+                result += '</div>';
+                resultDiv.innerHTML = result;
+                log(\`✅ Supabase: \${vehicles?.length || 0} véhicules, \${reservations?.length || 0} réservations\`, 'success');
+                
+            } catch (error) {
+                resultDiv.innerHTML = \`<p class="error">❌ Erreur: \${error.message}</p>\`;
+                log(\`❌ Erreur Supabase: \${error.message}\`, 'error');
+            }
+        }
+        
+        async function checkLocalStorageData() {
+            const resultDiv = document.getElementById('localStorageResult');
+            
+            try {
+                const vehiclesStr = localStorage.getItem('calendrcar-vehicles');
+                const reservationsStr = localStorage.getItem('calendrcar-reservations');
+                
+                const vehicles = vehiclesStr ? JSON.parse(vehiclesStr) : [];
+                const reservations = reservationsStr ? JSON.parse(reservationsStr) : [];
+                
+                let result = '<div class="data-box">';
+                result += \`<h3>💾 localStorage</h3>\`;
+                result += \`<div class="data-item info">📊 Véhicules: \${vehicles.length} trouvés</div>\`;
+                result += \`<div class="data-item info">📊 Réservations: \${reservations.length} trouvées</div>\`;
+                
+                if (vehicles.length > 0) {
+                    result += \`<h4>🚗 Véhicules localStorage:</h4>\`;
+                    vehicles.forEach(v => {
+                        result += \`<div class="data-item">\${v.name} (\${v.plate}) - \${v.status}</div>\`;
+                    });
+                }
+                
+                if (reservations.length > 0) {
+                    result += \`<h4>📅 Réservations localStorage:</h4>\`;
+                    reservations.forEach(r => {
+                        result += \`<div class="data-item">\${r.title} - \${r.client} (\${r.vehicleId}) - \${r.status}</div>\`;
+                    });
+                }
+                
+                result += '</div>';
+                resultDiv.innerHTML = result;
+                log(\`💾 localStorage: \${vehicles.length} véhicules, \${reservations.length} réservations\`, 'info');
+                
+            } catch (error) {
+                resultDiv.innerHTML = \`<p class="error">❌ Erreur localStorage: \${error.message}</p>\`;
+                log(\`❌ Erreur localStorage: \${error.message}\`, 'error');
+            }
+        }
+        
+        async function forceSyncFromSupabase() {
+            const resultDiv = document.getElementById('forceSyncResult');
+            resultDiv.innerHTML = '<p class="info">⬇️ Synchronisation depuis Supabase...</p>';
+            
+            try {
+                // Récupérer depuis Supabase
+                const { data: vehicles } = await supabase.from('vehicles').select('*');
+                const { data: reservations } = await supabase.from('reservations').select('*');
+                
+                // Sauvegarder en localStorage
+                if (vehicles) {
+                    localStorage.setItem('calendrcar-vehicles', JSON.stringify(vehicles));
+                }
+                if (reservations) {
+                    const formattedReservations = reservations.map(r => ({
+                        ...r,
+                        startTime: new Date(r.startTime),
+                        endTime: new Date(r.endTime)
+                    }));
+                    localStorage.setItem('calendrcar-reservations', JSON.stringify(formattedReservations));
+                }
+                
+                resultDiv.innerHTML = \`<p class="success">✅ Synchronisation terminée: \${vehicles?.length || 0} véhicules, \${reservations?.length || 0} réservations</p>\`;
+                log(\`✅ Sync depuis Supabase: \${vehicles?.length || 0} véhicules, \${reservations?.length || 0} réservations\`, 'success');
+                
+            } catch (error) {
+                resultDiv.innerHTML = \`<p class="error">❌ Erreur sync: \${error.message}</p>\`;
+                log(\`❌ Erreur sync depuis Supabase: \${error.message}\`, 'error');
+            }
+        }
+        
+        async function forceSyncToSupabase() {
+            const resultDiv = document.getElementById('forceSyncResult');
+            resultDiv.innerHTML = '<p class="info">⬆️ Synchronisation vers Supabase...</p>';
+            
+            try {
+                // Récupérer depuis localStorage
+                const vehiclesStr = localStorage.getItem('calendrcar-vehicles');
+                const reservationsStr = localStorage.getItem('calendrcar-reservations');
+                
+                if (vehiclesStr) {
+                    const vehicles = JSON.parse(vehiclesStr);
+                    await supabase.from('vehicles').delete().neq('id', '');
+                    await supabase.from('vehicles').insert(vehicles);
+                    log(\`⬆️ \${vehicles.length} véhicules envoyés vers Supabase\`, 'info');
+                }
+                
+                if (reservationsStr) {
+                    const reservations = JSON.parse(reservationsStr);
+                    const formattedReservations = reservations.map(r => ({
+                        ...r,
+                        startTime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
+                        endTime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString()
+                    }));
+                    
+                    await supabase.from('reservations').delete().neq('id', '');
+                    await supabase.from('reservations').insert(formattedReservations);
+                    log(\`⬆️ \${reservations.length} réservations envoyées vers Supabase\`, 'info');
+                }
+                
+                resultDiv.innerHTML = '<p class="success">✅ Données localStorage synchronisées vers Supabase</p>';
+                
+            } catch (error) {
+                resultDiv.innerHTML = \`<p class="error">❌ Erreur sync: \${error.message}</p>\`;
+                log(\`❌ Erreur sync vers Supabase: \${error.message}\`, 'error');
+            }
+        }
+        
+        async function clearLocalData() {
+            localStorage.removeItem('calendrcar-vehicles');
+            localStorage.removeItem('calendrcar-reservations');
+            document.getElementById('clearResult').innerHTML = '<p class="warning">⚠️ localStorage vidé</p>';
+            log('🗑️ localStorage vidé', 'warning');
+        }
+        
+        async function clearSupabaseData() {
+            try {
+                await supabase.from('vehicles').delete().neq('id', '');
+                await supabase.from('reservations').delete().neq('id', '');
+                document.getElementById('clearResult').innerHTML = '<p class="warning">⚠️ Supabase vidé</p>';
+                log('🗑️ Supabase vidé', 'warning');
+            } catch (error) {
+                document.getElementById('clearResult').innerHTML = \`<p class="error">❌ Erreur: \${error.message}</p>\`;
+                log(\`❌ Erreur vidage Supabase: \${error.message}\`, 'error');
+            }
+        }
+    </script>
+</body>
+</html> 
