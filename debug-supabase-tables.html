@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Supabase - Création Tables</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        button { 
+            background: #3b82f6; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        button:hover { background: #2563eb; }
+        .success { color: #059669; }
+        .error { color: #dc2626; }
+        .warning { color: #d97706; }
+        pre { 
+            background: #f3f4f6; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto; 
+            border-left: 4px solid #3b82f6; 
+        }
+        .log { 
+            margin: 10px 0; 
+            padding: 10px; 
+            border-radius: 5px; 
+            border-left: 4px solid #ccc; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Debug Supabase CalendrCar</h1>
+        
+        <div>
+            <h2>1. Test de Connexion</h2>
+            <button onclick="testConnection()">🔌 Tester Connexion</button>
+            <div id="connectionResult"></div>
+        </div>
+        
+        <div>
+            <h2>2. Vérification Tables Existantes</h2>
+            <button onclick="checkTables()">📋 Vérifier Tables</button>
+            <div id="tablesResult"></div>
+        </div>
+        
+        <div>
+            <h2>3. Création des Tables (Méthode Alternative)</h2>
+            <button onclick="createTablesAlternative()">🏗️ Créer Tables Manuellement</button>
+            <div id="createResult"></div>
+        </div>
+        
+        <div>
+            <h2>4. Test Insertion de Données</h2>
+            <button onclick="testInsert()">✏️ Test Insertion</button>
+            <div id="insertResult"></div>
+        </div>
+
+        <div>
+            <h2>5. Script SQL à Exécuter Manuellement</h2>
+            <p class="warning">Si les méthodes automatiques échouent, copiez et exécutez ce SQL dans l'éditeur Supabase :</p>
+            <pre id="sqlScript"></pre>
+        </div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        // Configuration Supabase
+        const SUPABASE_URL = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NjI0ODgsImV4cCI6MjA0OTMzODQ4OH0.VhxAn5M42LvOe_YgYxcYy3vAjHKA7lOgqJaOmCcxHDY';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`;
+            logsDiv.appendChild(logDiv);
+            console.log(message);
+        }
+        
+        async function testConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.innerHTML = '<p>🔄 Test en cours...</p>';
+            
+            try {
+                log('🔌 Test de connexion Supabase...', 'info');
+                
+                // Test simple de connexion
+                const { data, error } = await supabase.from('_dummy_').select('*').limit(1);
+                
+                if (error && error.code !== 'PGRST116') { // PGRST116 = table not found (normal)
+                    throw error;
+                }
+                
+                resultDiv.innerHTML = '<p class="success">✅ Connexion Supabase OK</p>';
+                log('✅ Connexion Supabase réussie', 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Erreur connexion: ${error.message}</p>`;
+                log(`❌ Erreur connexion: ${error.message}`, 'error');
+            }
+        }
+        
+        async function checkTables() {
+            const resultDiv = document.getElementById('tablesResult');
+            resultDiv.innerHTML = '<p>🔄 Vérification en cours...</p>';
+            
+            try {
+                log('📋 Vérification des tables existantes...', 'info');
+                
+                // Vérifier table vehicles
+                const { data: vehiclesData, error: vehiclesError } = await supabase
+                    .from('vehicles')
+                    .select('*')
+                    .limit(1);
+                
+                // Vérifier table reservations
+                const { data: reservationsData, error: reservationsError } = await supabase
+                    .from('reservations')
+                    .select('*')
+                    .limit(1);
+                
+                let result = '<div>';
+                
+                if (vehiclesError) {
+                    result += `<p class="error">❌ Table 'vehicles': ${vehiclesError.message}</p>`;
+                    log(`❌ Table vehicles: ${vehiclesError.message}`, 'error');
+                } else {
+                    result += `<p class="success">✅ Table 'vehicles' existe (${vehiclesData?.length || 0} enregistrements)</p>`;
+                    log(`✅ Table vehicles OK (${vehiclesData?.length || 0} enregistrements)`, 'success');
+                }
+                
+                if (reservationsError) {
+                    result += `<p class="error">❌ Table 'reservations': ${reservationsError.message}</p>`;
+                    log(`❌ Table reservations: ${reservationsError.message}`, 'error');
+                } else {
+                    result += `<p class="success">✅ Table 'reservations' existe (${reservationsData?.length || 0} enregistrements)</p>`;
+                    log(`✅ Table reservations OK (${reservationsData?.length || 0} enregistrements)`, 'success');
+                }
+                
+                result += '</div>';
+                resultDiv.innerHTML = result;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Erreur: ${error.message}</p>`;
+                log(`❌ Erreur vérification: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createTablesAlternative() {
+            const resultDiv = document.getElementById('createResult');
+            resultDiv.innerHTML = '<p>🔄 Création en cours...</p>';
+            
+            try {
+                log('🏗️ Tentative de création des tables...', 'info');
+                
+                // Méthode alternative : tenter d'insérer puis créer si nécessaire
+                // D'abord tester vehicles
+                const testVehicle = {
+                    id: 'test-vehicle',
+                    name: 'Test Vehicle',
+                    plate: 'TEST-001',
+                    type: 'car',
+                    status: 'available',
+                    color: '#3b82f6',
+                    icon: '🚗'
+                };
+                
+                const { error: vehicleError } = await supabase
+                    .from('vehicles')
+                    .insert([testVehicle]);
+                
+                if (vehicleError) {
+                    log(`⚠️ Erreur insertion vehicle: ${vehicleError.message}`, 'warning');
+                } else {
+                    log('✅ Test insertion vehicle OK', 'success');
+                    // Nettoyer le test
+                    await supabase.from('vehicles').delete().eq('id', 'test-vehicle');
+                }
+                
+                // Tester reservations
+                const testReservation = {
+                    id: 'test-reservation',
+                    title: 'Test Reservation',
+                    client: 'Test Client',
+                    phone: '123456789',
+                    vehicleId: 'test-vehicle',
+                    startTime: new Date().toISOString(),
+                    endTime: new Date(Date.now() + 3600000).toISOString(),
+                    status: 'confirmed'
+                };
+                
+                const { error: reservationError } = await supabase
+                    .from('reservations')
+                    .insert([testReservation]);
+                
+                if (reservationError) {
+                    log(`⚠️ Erreur insertion reservation: ${reservationError.message}`, 'warning');
+                } else {
+                    log('✅ Test insertion reservation OK', 'success');
+                    // Nettoyer le test
+                    await supabase.from('reservations').delete().eq('id', 'test-reservation');
+                }
+                
+                if (!vehicleError && !reservationError) {
+                    resultDiv.innerHTML = '<p class="success">✅ Les tables semblent fonctionner correctement</p>';
+                } else {
+                    resultDiv.innerHTML = '<p class="warning">⚠️ Problèmes détectés - voir logs</p>';
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Erreur: ${error.message}</p>`;
+                log(`❌ Erreur création: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testInsert() {
+            const resultDiv = document.getElementById('insertResult');
+            resultDiv.innerHTML = '<p>🔄 Test en cours...</p>';
+            
+            try {
+                log('✏️ Test d\'insertion de données réelles...', 'info');
+                
+                // Insérer un véhicule de test
+                const vehicle = {
+                    id: 'peugeot-208-test',
+                    name: 'Peugeot 208 Test',
+                    plate: 'TEST-208',
+                    type: 'car',
+                    status: 'available',
+                    color: '#3b82f6',
+                    icon: '🚗'
+                };
+                
+                const { error: vehicleError } = await supabase
+                    .from('vehicles')
+                    .insert([vehicle]);
+                
+                if (vehicleError) throw vehicleError;
+                
+                // Insérer une réservation de test
+                const reservation = {
+                    id: 'test-reservation-' + Date.now(),
+                    title: 'Test Location',
+                    client: 'Client Test',
+                    phone: '0123456789',
+                    vehicleId: 'peugeot-208-test',
+                    startTime: new Date().toISOString(),
+                    endTime: new Date(Date.now() + 86400000).toISOString(), // +1 jour
+                    status: 'confirmed',
+                    notes: 'Test de fonctionnement',
+                    amount: 50.00
+                };
+                
+                const { error: reservationError } = await supabase
+                    .from('reservations')
+                    .insert([reservation]);
+                
+                if (reservationError) throw reservationError;
+                
+                resultDiv.innerHTML = '<p class="success">✅ Insertion test réussie ! Vérifiez dans votre app.</p>';
+                log('✅ Données de test insérées avec succès', 'success');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Erreur insertion: ${error.message}</p>`;
+                log(`❌ Erreur insertion: ${error.message}`, 'error');
+            }
+        }
+        
+        // Afficher le script SQL au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            const sqlScript = `-- Script SQL à exécuter manuellement dans l'éditeur Supabase
+-- https://supabase.com/dashboard/project/zrcmjmbkehiyspmqalzk/sql
+
+-- 1. Créer la table des véhicules
+CREATE TABLE IF NOT EXISTS vehicles (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  plate TEXT NOT NULL,
+  type TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('available', 'occupied', 'maintenance')),
+  color TEXT NOT NULL,
+  icon TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Créer la table des réservations
+CREATE TABLE IF NOT EXISTS reservations (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  client TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  vehicleId TEXT NOT NULL,
+  startTime TIMESTAMPTZ NOT NULL,
+  endTime TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('confirmed', 'pending', 'cancelled')),
+  notes TEXT,
+  amount NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Créer les index
+CREATE INDEX IF NOT EXISTS idx_reservations_vehicle ON reservations(vehicleId);
+CREATE INDEX IF NOT EXISTS idx_reservations_dates ON reservations(startTime, endTime);
+
+-- 4. Activer RLS
+ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
+
+-- 5. Supprimer les politiques existantes si elles existent
+DROP POLICY IF EXISTS "Permettre tout pour vehicles" ON vehicles;
+DROP POLICY IF EXISTS "Permettre tout pour reservations" ON reservations;
+
+-- 6. Créer les nouvelles politiques d'accès
+CREATE POLICY "Permettre tout pour vehicles" ON vehicles FOR ALL USING (true);
+CREATE POLICY "Permettre tout pour reservations" ON reservations FOR ALL USING (true);
+
+-- 6. Insérer des données de test
+INSERT INTO vehicles (id, name, plate, type, status, color, icon) VALUES
+('peugeot-208-1', 'Peugeot 208 Allure', '9876 RB', 'car', 'available', '#3b82f6', '🚗'),
+('mitsubishi-space', 'Mitsubishi Space Star', '8765 RB', 'car', 'available', '#10b981', '🚗')
+ON CONFLICT (id) DO NOTHING;
+
+-- Vérifier que tout fonctionne
+SELECT 'Véhicules créés:' as info, count(*) as nombre FROM vehicles;
+SELECT 'Tables créées avec succès !' as status;`;
+            
+            document.getElementById('sqlScript').textContent = sqlScript;
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Supabase</title>
+</head>
+<body>
+    <h1>Test de Connexion Supabase</h1>
+    <button onclick="testSupabase()">Tester Supabase</button>
+    <div id="result"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const supabaseUrl = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0MTU4MTksImV4cCI6MjA2Njk5MTgxOX0.t_HWBYsUK-qJrU-GjQ314Irr1DsiArbci0i7xXen9DM';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function testSupabase() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Test en cours...';
+            
+            try {
+                // Test simple : lire la table reservations
+                const { data, error } = await supabase
+                    .from('reservations')
+                    .select('*');
+                
+                if (error) {
+                    result.innerHTML = `❌ Erreur: ${error.message}`;
+                } else {
+                    result.innerHTML = `✅ Succès! ${data.length} réservations trouvées:<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (err) {
+                result.innerHTML = `❌ Erreur réseau: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html> 

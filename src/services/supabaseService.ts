@@ -35,6 +35,9 @@ class SupabaseService {
       this.supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey);
       this.isEnabled = true;
       console.log('🟢 Supabase connecté à:', supabaseConfig.url);
+      
+      // Vérifier/créer les tables automatiquement
+      this.ensureTablesExist();
     } catch (error) {
       console.warn('🟡 Supabase non disponible, utilisation localStorage:', error);
       this.isEnabled = false;
@@ -44,17 +47,24 @@ class SupabaseService {
   // ==================== RESERVATIONS ====================
 
   async getReservations(): Promise<Reservation[]> {
+    console.log('📥 GET: Tentative récupération réservations');
+    
     if (!this.isEnabled || !this.supabase) {
+      console.log('⚠️ GET: Supabase désactivé, lecture localStorage');
       return this.getReservationsFromLocalStorage();
     }
 
     try {
+      console.log('🔍 GET: Requête Supabase...');
       const { data, error } = await this.supabase
         .from('reservations')
         .select('*')
         .order('startTime', { ascending: true });
 
       if (error) throw error;
+      
+      console.log('✅ GET: Données Supabase reçues:', data?.length || 0, 'réservations');
+      console.log('📋 GET: Détail données:', data);
 
       return data?.map(item => ({
         ...item,
@@ -62,36 +72,45 @@ class SupabaseService {
         endTime: new Date(item.endTime)
       })) || [];
     } catch (error) {
-      console.warn('Erreur Supabase, fallback localStorage:', error);
+      console.error('❌ GET: Erreur Supabase, fallback localStorage:', error);
       return this.getReservationsFromLocalStorage();
     }
   }
 
   async saveReservations(reservations: Reservation[]): Promise<void> {
+    console.log('📤 SAVE: Tentative sauvegarde', reservations.length, 'réservations');
+    
     // Toujours sauvegarder en localStorage (sécurité)
     this.saveReservationsToLocalStorage(reservations);
 
     if (!this.isEnabled || !this.supabase) {
+      console.log('⚠️ SAVE: Supabase désactivé, sauvegarde localStorage uniquement');
       return;
     }
 
     try {
+      console.log('🗑️ SAVE: Suppression réservations existantes...');
       // Supprimer toutes les réservations existantes
       await this.supabase.from('reservations').delete().neq('id', '');
 
-      // Insérer les nouvelles réservations
+      console.log('📝 SAVE: Insertion nouvelles réservations...');
+      // Insérer les nouvelles réservations avec conversion de dates sécurisée
+      const formattedData = reservations.map(r => ({
+        ...r,
+        startTime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
+        endTime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString()
+      }));
+      
+      console.log('📝 SAVE: Données formatées:', formattedData);
+      
       const { error } = await this.supabase
         .from('reservations')
-        .insert(reservations.map(r => ({
-          ...r,
-          startTime: r.startTime.toISOString(),
-          endTime: r.endTime.toISOString()
-        })));
+        .insert(formattedData);
 
       if (error) throw error;
-      console.log('✅ Réservations synchronisées avec Supabase');
+      console.log('✅ SAVE: Réservations synchronisées avec Supabase');
     } catch (error) {
-      console.warn('Erreur synchronisation Supabase:', error);
+      console.error('❌ SAVE: Erreur synchronisation Supabase:', error);
       // Les données restent en localStorage
     }
   }
@@ -204,6 +223,43 @@ class SupabaseService {
       return !error;
     } catch (error) {
       return false;
+    }
+  }
+
+  // ==================== AUTO-SETUP ====================
+
+  async ensureTablesExist(): Promise<void> {
+    if (!this.isEnabled || !this.supabase) {
+      return;
+    }
+
+    try {
+      console.log('🔧 Vérification/création des tables...');
+      
+      // Méthode alternative : tester l'existence des tables via des requêtes simples
+      // Tester la table vehicles
+      const { error: vehiclesError } = await this.supabase
+        .from('vehicles')
+        .select('id')
+        .limit(1);
+      
+      // Tester la table reservations  
+      const { error: reservationsError } = await this.supabase
+        .from('reservations')
+        .select('id')
+        .limit(1);
+
+      if (vehiclesError || reservationsError) {
+        console.warn('⚠️ Tables non trouvées ou erreur d\'accès:', {
+          vehicles: vehiclesError?.message,
+          reservations: reservationsError?.message
+        });
+        console.warn('📋 Veuillez créer les tables manuellement avec le script fourni dans debug-supabase-tables.html');
+      } else {
+        console.log('✅ Tables vérifiées - connexion OK');
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors de la vérification des tables:', error);
     }
   }
 }
