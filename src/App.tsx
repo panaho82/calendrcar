@@ -3817,11 +3817,11 @@ const AuthenticatedApp: React.FC = () => {
           // Toujours afficher une notification d'auto-sync (même si 'none')
           if (autoSyncResult.action === 'none') {
             if (autoSyncResult.message.includes('désactivée')) {
-              showNotification('🔒 Auto-sync désactivée', 'info');
+              console.log('🔒 Auto-sync désactivée');
             } else if (autoSyncResult.message.includes('hors ligne')) {
-              showNotification('📴 Mode hors ligne détecté', 'info');
+              console.log('📴 Mode hors ligne détecté');
             } else {
-              showNotification('✅ Données déjà synchronisées', 'success');
+              console.log('✅ Données déjà synchronisées');
             }
           } else {
             showNotification(`${actionEmoji} ${autoSyncResult.message}`, 
@@ -3838,25 +3838,55 @@ const AuthenticatedApp: React.FC = () => {
           setLastSyncStatus('synced');
         }
 
-        // 🚀 ÉTAPE 2: Charger les données (maintenant synchronisées)
+        // 🚀 ÉTAPE 2: Charger les données avec priorité aux données locales récentes
         const loadedReservations = await supabaseService.getReservations();
-        if (loadedReservations.length > 0) {
-          setReservations(loadedReservations);
-        } else {
-          // Aucune donnée en base, charger les exemples
-          setReservations(EXAMPLE_RESERVATIONS);
-          await supabaseService.saveReservations(EXAMPLE_RESERVATIONS);
-          showNotification('Données d\'exemple initialisées', 'info');
-        }
-
-        // Charger les véhicules
         const loadedVehicles = await supabaseService.getVehicles();
-        if (loadedVehicles.length > 0) {
-          setVehicles(loadedVehicles);
+        
+        // Vérifier localStorage d'abord (données les plus récentes)
+        const savedReservations = localStorage.getItem(STORAGE_KEY);
+        const savedVehicles = localStorage.getItem(VEHICLES_STORAGE_KEY);
+        const lastSync = localStorage.getItem('calendrcar-last-sync');
+        
+        // Déterminer quelle source utiliser
+        const useLocalData = savedReservations || savedVehicles;
+        const hasRecentLocalChanges = lastSync && (Date.now() - new Date(lastSync).getTime() < 60000); // Moins d'1 minute
+        
+        if (useLocalData && (!loadedReservations.length || hasRecentLocalChanges)) {
+          // Priorité aux données localStorage (plus récentes ou Supabase vide)
+          console.log('📋 Chargement depuis localStorage (données récentes)');
+          
+          if (savedVehicles) {
+            try {
+              const parsedVehicles = JSON.parse(savedVehicles);
+              setVehicles(parsedVehicles);
+            } catch {
+              setVehicles(loadedVehicles.length > 0 ? loadedVehicles : INITIAL_VEHICLES);
+            }
+          } else {
+            setVehicles(loadedVehicles.length > 0 ? loadedVehicles : INITIAL_VEHICLES);
+          }
+          
+          if (savedReservations) {
+            try {
+              const parsedData = JSON.parse(savedReservations);
+              const convertedData = parsedData.map((item: any) => ({
+                ...item,
+                startTime: new Date(item.startTime),
+                endTime: new Date(item.endTime)
+              }));
+              setReservations(convertedData);
+              console.log('📋 Réservations localStorage chargées:', convertedData.length);
+            } catch {
+              setReservations(loadedReservations.length > 0 ? loadedReservations : EXAMPLE_RESERVATIONS);
+            }
+          } else {
+            setReservations(loadedReservations.length > 0 ? loadedReservations : EXAMPLE_RESERVATIONS);
+          }
         } else {
-          // Aucun véhicule en base, charger les exemples
-          setVehicles(INITIAL_VEHICLES);
-          await supabaseService.saveVehicles(INITIAL_VEHICLES);
+          // Utiliser Supabase si disponible et pas de données locales récentes
+          console.log('📥 Chargement depuis Supabase:', loadedVehicles.length, 'véhicules,', loadedReservations.length, 'réservations');
+          setVehicles(loadedVehicles.length > 0 ? loadedVehicles : INITIAL_VEHICLES);
+          setReservations(loadedReservations.length > 0 ? loadedReservations : EXAMPLE_RESERVATIONS);
         }
 
         // Indiquer le statut de synchronisation
@@ -3911,6 +3941,9 @@ const AuthenticatedApp: React.FC = () => {
       const saveReservations = async () => {
         try {
           await supabaseService.saveReservations(reservations);
+          
+          // Marquer la synchronisation immédiatement
+          localStorage.setItem('calendrcar-last-sync', new Date().toISOString());
           
           // 🚀 ÉTAPE 2: Auto-Sync après modification de réservation
           const autoSyncResult = await syncService.performAutoSyncAfterChange('reservation');

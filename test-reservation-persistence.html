@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Test Persistence Réservations CalendrCar</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 5px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #555; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Persistence Réservations</h1>
+        
+        <div class="status error">
+            <strong>🚨 PROBLÈME IDENTIFIÉ :</strong><br>
+            Quand vous créez une réservation puis actualisez, elle disparaît car l'app charge les données vides de Supabase au lieu de préserver les données locales récentes.
+        </div>
+
+        <h2>🧪 Tests de Diagnostic</h2>
+        
+        <button onclick="testLocalStorage()">📋 Vérifier localStorage</button>
+        <button onclick="testSupabaseConnection()">🔗 Tester Supabase</button>
+        <button onclick="simulateReservation()">➕ Simuler Nouvelle Réservation</button>
+        <button onclick="forceFixPersistence()">🔧 CORRIGER la Persistence</button>
+        
+        <div id="results"></div>
+
+        <h2>➕ Ajouter Réservation de Test</h2>
+        <div>
+            <input type="text" id="clientName" placeholder="Nom client" value="Test Client">
+            <input type="text" id="clientPhone" placeholder="Téléphone" value="0123456789">
+            <input type="datetime-local" id="startTime" value="">
+            <input type="datetime-local" id="endTime" value="">
+            <button class="success" onclick="addTestReservation()">➕ Ajouter Réservation</button>
+        </div>
+
+        <h2>📊 État Actuel des Données</h2>
+        <div id="dataStatus"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0MTU4MTksImV4cCI6MjA2Njk5MTgxOX0.t_HWBYsUK-qJrU-GjQ314Irr1DsiArbci0i7xXen9DM';
+        
+        function addResult(type, title, content) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${title}</strong><br>${content}`;
+            results.appendChild(div);
+        }
+
+        function updateDataStatus() {
+            const dataStatus = document.getElementById('dataStatus');
+            
+            // localStorage
+            const localReservations = localStorage.getItem('calendrcar-reservations');
+            const localVehicles = localStorage.getItem('calendrcar-vehicles');
+            
+            let html = '<h3>📋 localStorage</h3>';
+            
+            if (localReservations) {
+                try {
+                    const parsed = JSON.parse(localReservations);
+                    html += `<div class="status info">
+                        <strong>Réservations (${parsed.length}):</strong><br>
+                        ${parsed.slice(0, 3).map(r => `• ${r.client} - ${r.title}`).join('<br>')}
+                        ${parsed.length > 3 ? `<br>• ... et ${parsed.length - 3} autres` : ''}
+                    </div>`;
+                } catch {
+                    html += '<div class="status error">Données réservations corrompues</div>';
+                }
+            } else {
+                html += '<div class="status warning">Aucune réservation en localStorage</div>';
+            }
+            
+            if (localVehicles) {
+                try {
+                    const parsed = JSON.parse(localVehicles);
+                    html += `<div class="status info">
+                        <strong>Véhicules (${parsed.length}):</strong><br>
+                        ${parsed.slice(0, 3).map(v => `• ${v.name} (${v.plate})`).join('<br>')}
+                        ${parsed.length > 3 ? `<br>• ... et ${parsed.length - 3} autres` : ''}
+                    </div>`;
+                } catch {
+                    html += '<div class="status error">Données véhicules corrompues</div>';
+                }
+            } else {
+                html += '<div class="status warning">Aucun véhicule en localStorage</div>';
+            }
+            
+            dataStatus.innerHTML = html;
+        }
+
+        async function testLocalStorage() {
+            addResult('info', '📋 Test localStorage...', 'Vérification des données locales...');
+            
+            const reservations = localStorage.getItem('calendrcar-reservations');
+            const vehicles = localStorage.getItem('calendrcar-vehicles');
+            
+            let content = '';
+            
+            if (reservations) {
+                try {
+                    const parsed = JSON.parse(reservations);
+                    content += `✅ ${parsed.length} réservations en localStorage<br>`;
+                } catch {
+                    content += '❌ Données réservations corrompues<br>';
+                }
+            } else {
+                content += '⚠️ Aucune réservation en localStorage<br>';
+            }
+            
+            if (vehicles) {
+                try {
+                    const parsed = JSON.parse(vehicles);
+                    content += `✅ ${parsed.length} véhicules en localStorage<br>`;
+                } catch {
+                    content += '❌ Données véhicules corrompues<br>';
+                }
+            } else {
+                content += '⚠️ Aucun véhicule en localStorage<br>';
+            }
+            
+            addResult('info', '📊 Résultat localStorage', content);
+            updateDataStatus();
+        }
+
+        async function testSupabaseConnection() {
+            addResult('info', '🔗 Test Supabase...', 'Connexion à la base de données...');
+            
+            try {
+                // Test réservations
+                const reservationsResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                
+                // Test véhicules
+                const vehiclesResponse = await fetch(`${SUPABASE_URL}/rest/v1/vehicles`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                
+                if (reservationsResponse.ok && vehiclesResponse.ok) {
+                    const reservations = await reservationsResponse.json();
+                    const vehicles = await vehiclesResponse.json();
+                    
+                    addResult('success', '✅ Supabase OK !', `
+                        • ${reservations.length} réservations en base<br>
+                        • ${vehicles.length} véhicules en base<br>
+                        • Connexion réussie
+                    `);
+                } else {
+                    addResult('error', '❌ Erreur Supabase', `
+                        Réservations: HTTP ${reservationsResponse.status}<br>
+                        Véhicules: HTTP ${vehiclesResponse.status}
+                    `);
+                }
+                
+            } catch (error) {
+                addResult('error', '❌ Erreur réseau', error.message);
+            }
+        }
+
+        function simulateReservation() {
+            addResult('info', '➕ Simulation réservation...', 'Création d\'une réservation de test...');
+            
+            // Créer une réservation de test
+            const testReservation = {
+                id: 'test-' + Date.now(),
+                title: 'Test Persistence',
+                client: 'Client Test',
+                phone: '0123456789',
+                vehicleId: 'peugeot-208-1',
+                startTime: new Date().toISOString(),
+                endTime: new Date(Date.now() + 3600000).toISOString(), // +1 heure
+                status: 'confirmed',
+                notes: 'Réservation de test pour vérifier la persistence',
+                amount: 50
+            };
+            
+            // Récupérer les réservations existantes
+            const existing = localStorage.getItem('calendrcar-reservations');
+            let reservations = [];
+            
+            if (existing) {
+                try {
+                    reservations = JSON.parse(existing);
+                } catch {
+                    reservations = [];
+                }
+            }
+            
+            // Ajouter la nouvelle réservation
+            reservations.push(testReservation);
+            
+            // Sauvegarder
+            localStorage.setItem('calendrcar-reservations', JSON.stringify(reservations));
+            
+            addResult('success', '✅ Réservation créée !', `
+                • ID: ${testReservation.id}<br>
+                • Client: ${testReservation.client}<br>
+                • Véhicule: ${testReservation.vehicleId}<br>
+                • Total réservations: ${reservations.length}<br>
+                <strong>🔄 Actualisez maintenant votre app CalendrCar pour voir si elle persiste !</strong>
+            `);
+            
+            updateDataStatus();
+        }
+
+        async function forceFixPersistence() {
+            addResult('info', '🔧 Correction persistence...', 'Application du correctif...');
+            
+            try {
+                // 1. Sauvegarder les données locales actuelles
+                const localReservations = localStorage.getItem('calendrcar-reservations');
+                const localVehicles = localStorage.getItem('calendrcar-vehicles');
+                
+                if (!localReservations && !localVehicles) {
+                    addResult('warning', '⚠️ Aucune donnée locale', 'Aucune donnée à préserver');
+                    return;
+                }
+                
+                // 2. Uploader vers Supabase
+                if (localReservations) {
+                    const reservations = JSON.parse(localReservations);
+                    
+                    // Supprimer anciennes données
+                    await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=neq.none`, {
+                        method: 'DELETE',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`
+                        }
+                    });
+                    
+                    // Insérer nouvelles données
+                    const formattedReservations = reservations.map(r => ({
+                        ...r,
+                        vehicleid: r.vehicleId,
+                        starttime: new Date(r.startTime).toISOString(),
+                        endtime: new Date(r.endTime).toISOString()
+                    }));
+                    
+                    const response = await fetch(`${SUPABASE_URL}/rest/v1/reservations`, {
+                        method: 'POST',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=minimal'
+                        },
+                        body: JSON.stringify(formattedReservations)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erreur upload réservations: ${response.status}`);
+                    }
+                }
+                
+                // 3. Marquer la synchronisation
+                localStorage.setItem('calendrcar-last-sync', new Date().toISOString());
+                
+                addResult('success', '✅ Correction appliquée !', `
+                    • Données locales préservées<br>
+                    • Upload vers Supabase réussi<br>
+                    • Synchronisation marquée<br>
+                    <strong>🔄 Actualisez votre app maintenant !</strong>
+                `);
+                
+            } catch (error) {
+                addResult('error', '❌ Erreur correction', `Impossible d'appliquer le correctif: ${error.message}`);
+            }
+        }
+
+        async function addTestReservation() {
+            const clientName = document.getElementById('clientName').value;
+            const clientPhone = document.getElementById('clientPhone').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            if (!clientName || !startTime || !endTime) {
+                addResult('error', '❌ Données manquantes', 'Veuillez remplir tous les champs obligatoires');
+                return;
+            }
+            
+            const reservation = {
+                id: 'manual-' + Date.now(),
+                title: `Location - ${clientName}`,
+                client: clientName,
+                phone: clientPhone,
+                vehicleId: 'peugeot-208-1', // Premier véhicule par défaut
+                startTime: new Date(startTime).toISOString(),
+                endTime: new Date(endTime).toISOString(),
+                status: 'confirmed',
+                notes: 'Réservation créée via test de persistence',
+                amount: 45
+            };
+            
+            // Ajouter à localStorage
+            const existing = localStorage.getItem('calendrcar-reservations');
+            let reservations = existing ? JSON.parse(existing) : [];
+            reservations.push(reservation);
+            localStorage.setItem('calendrcar-reservations', JSON.stringify(reservations));
+            
+            // Upload vers Supabase
+            try {
+                await forceFixPersistence();
+                addResult('success', '✅ Réservation ajoutée !', `
+                    • Client: ${clientName}<br>
+                    • Du: ${new Date(startTime).toLocaleString()}<br>
+                    • Au: ${new Date(endTime).toLocaleString()}<br>
+                    • ID: ${reservation.id}
+                `);
+            } catch (error) {
+                addResult('warning', '⚠️ Réservation locale uniquement', `Sauvegardée en localStorage mais erreur upload Supabase: ${error.message}`);
+            }
+            
+            updateDataStatus();
+        }
+
+        // Initialisation
+        window.addEventListener('load', () => {
+            // Pré-remplir les dates
+            const now = new Date();
+            const tomorrow = new Date(now.getTime() + 24*60*60*1000);
+            
+            document.getElementById('startTime').value = now.toISOString().slice(0, 16);
+            document.getElementById('endTime').value = tomorrow.toISOString().slice(0, 16);
+            
+            // Afficher l'état initial
+            updateDataStatus();
+            
+            addResult('info', '🔧 Outil de diagnostic prêt', 'Utilisez les boutons ci-dessus pour diagnostiquer et corriger les problèmes de persistence.');
+        });
+    </script>
+</body>
+</html> 
