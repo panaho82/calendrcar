@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabaseService } from './services/supabaseService.ts';
+import SyncPanel from './components/SyncPanel.tsx';
 import { 
   Calendar, 
   Clock, 
@@ -33,7 +34,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  LogIn
+  LogIn,
+  Cloud
 } from "lucide-react";
 // Imports PWA temporairement désactivés pour les tests
 // import { usePWA } from './hooks/usePWA';
@@ -959,6 +961,7 @@ const Sidebar = ({
   const { logout, username } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPWASettingsOpen, setIsPWASettingsOpen] = useState(false);
+  const [isSyncPanelOpen, setIsSyncPanelOpen] = useState(false);
   // Temporairement désactivé pour les tests
   // const pwa = usePWA();
   const pwa = {
@@ -1044,6 +1047,16 @@ const Sidebar = ({
         </div>
 
         <button 
+          onClick={() => setIsSyncPanelOpen(true)}
+          className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700"
+        >
+          <Cloud className={`h-5 w-5 flex-shrink-0 ${isExpanded ? '' : 'mx-auto'}`} />
+          <span className={`ml-3 transition-opacity duration-300 font-medium text-sm ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            Synchronisation
+          </span>
+        </button>
+
+        <button 
           onClick={onToggleTheme}
           className="w-full flex items-center px-3 py-3 text-left hover:bg-gray-800 transition-colors rounded-md hover:bg-gray-700"
         >
@@ -1115,6 +1128,14 @@ const Sidebar = ({
         isDarkMode={isDarkMode}
         isOpen={isPWASettingsOpen}
         onClose={() => setIsPWASettingsOpen(false)}
+        showNotification={showNotification}
+      />
+
+      {/* Sync Panel */}
+      <SyncPanel
+        isDarkMode={isDarkMode}
+        isOpen={isSyncPanelOpen}
+        onClose={() => setIsSyncPanelOpen(false)}
         showNotification={showNotification}
       />
     </div>
