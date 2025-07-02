@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Connexion Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Test Connexion Supabase</h1>
+    <button onclick="testConnection()">Tester Connexion</button>
+    <div id="result"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://zrcmjmbkehiyspmqalzk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyY21qbWJrZWhpeXNwbXFhbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NjI0ODgsImV4cCI6MjA0OTMzODQ4OH0.VhxAn5M42LvOe_YgYxcYy3vAjHKA7lOgqJaOmCcxHDY';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Test en cours...';
+            
+            try {
+                // Test simple
+                const { data, error } = await supabase.from('vehicles').select('*').limit(1);
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erreur: ${error.message}`;
+                    console.error('Erreur:', error);
+                } else {
+                    resultDiv.innerHTML = `✅ Connexion OK! ${data?.length || 0} véhicules trouvés`;
+                    console.log('Succès:', data);
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erreur connexion: ${err.message}`;
+                console.error('Erreur connexion:', err);
+            }
+        }
+        
+        // Test automatique au chargement
+        window.onload = testConnection;
+    </script>
+</body>
+</html> 
