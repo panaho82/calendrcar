@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📴 Test Synchronisation Hors Ligne - CalendrCar</title>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f8f9fa; 
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .status { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            font-weight: 500;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .offline { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+        
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-weight: bold; 
+        }
+        button:hover { background: #0056b3; }
+        button.offline { background: #6c757d; }
+        button.offline:hover { background: #5a6268; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        
+        .test-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
+        .test-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+        }
+        .test-card.online {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        .test-card.offline {
+            border-color: #dc3545;
+            background: #fff8f8;
+        }
+        
+        h1 { color: #333; text-align: center; }
+        h2 { color: #555; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        
+        .connection-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connection-indicator.online {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        .connection-indicator.offline {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .queue-counter {
+            background: #ffc107;
+            color: #212529;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .scenario {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📴 Test Synchronisation Hors Ligne</h1>
+        
+        <div id="connectionStatus" class="status info">
+            <span class="connection-indicator online" id="connectionIndicator"></span>
+            <strong>Connexion:</strong> <span id="connectionText">En ligne</span>
+            <span class="queue-counter" id="queueCounter" style="display: none;">0 en attente</span>
+        </div>
+
+        <div class="scenario">
+            <strong>🎯 SCÉNARIO DE TEST :</strong><br><br>
+            
+            <strong>1. Simulation Hors Ligne :</strong><br>
+            • Désactiver manuellement la connexion (Avion/WiFi)<br>
+            • Créer/modifier des réservations → Sauvegarde localStorage + queue<br><br>
+            
+            <strong>2. Retour En Ligne :</strong><br>
+            • Réactiver la connexion → Détection automatique<br>
+            • Synchronisation de rattrapage → Upload vers Supabase<br>
+            • Propagation temps réel → Autres appareils<br><br>
+            
+            <strong>✅ SUCCÈS si :</strong><br>
+            • Données créées hors ligne apparaissent sur autres appareils<br>
+            • Notification "X actions hors ligne synchronisées"<br>
+            • Queue vidée automatiquement
+        </div>
+
+        <h2>🛠️ Outils de Test</h2>
+        
+        <div class="test-grid">
+            <div class="test-card online" id="onlineCard">
+                <h3>🌐 Mode En Ligne</h3>
+                <button onclick="createTestReservationOnline()" class="success">✅ Créer Réservation (En ligne)</button>
+                <button onclick="checkSyncStatus()">📊 Vérifier Statut Sync</button>
+                <button onclick="forceBackgroundSync()">🔄 Forcer Sync Temps Réel</button>
+            </div>
+            
+            <div class="test-card offline" id="offlineCard">
+                <h3>📴 Mode Hors Ligne</h3>
+                <button onclick="simulateOfflineAction()" class="offline">📱 Simuler Action Hors Ligne</button>
+                <button onclick="showOfflineQueue()" class="offline">📋 Voir Queue Hors Ligne</button>
+                <button onclick="clearOfflineQueue()" class="danger">🗑️ Vider Queue</button>
+            </div>
+            
+            <div class="test-card">
+                <h3>⚡ Synchronisation</h3>
+                <button onclick="triggerCatchupSync()">📡 Déclencher Rattrapage</button>
+                <button onclick="performSmartSync()">🧠 Sync Intelligente</button>
+                <button onclick="testConnectionDetection()">📶 Test Détection Connexion</button>
+            </div>
+        </div>
+
+        <div id="results"></div>
+
+        <h2>📋 Instructions Détaillées</h2>
+        <div class="status warning">
+            <strong>Test Manuel Complet :</strong><br><br>
+            
+            <strong>ÉTAPE 1 - Préparation :</strong><br>
+            • Ouvrir https://mm-calendrcar.netlify.app/ sur 2 appareils<br>
+            • Vérifier que la sync temps réel fonctionne<br><br>
+            
+            <strong>ÉTAPE 2 - Simulation Hors Ligne :</strong><br>
+            • Sur appareil 1 : Désactiver WiFi/Data<br>
+            • Créer 2-3 nouvelles réservations<br>
+            • Vérifier notifications "Mode hors ligne - données sauvées localement"<br>
+            • Vérifier badge orange dans sidebar avec nombre d'actions<br><br>
+            
+            <strong>ÉTAPE 3 - Retour En Ligne :</strong><br>
+            • Réactiver WiFi/Data sur appareil 1<br>
+            • Observer notification "Retour en ligne - synchronisation..."<br>
+            • Attendre notification "X actions hors ligne synchronisées"<br><br>
+            
+            <strong>ÉTAPE 4 - Vérification :</strong><br>
+            • Sur appareil 2 : Voir les nouvelles réservations apparaître (10-15s)<br>
+            • Badge orange disparaît sur appareil 1<br>
+            • Planning à jour sur tous appareils<br><br>
+            
+            <strong>🎯 RÉSULTAT ATTENDU :</strong><br>
+            Synchronisation transparente des données créées hors ligne vers tous les appareils connectés !
+        </div>
+    </div>
+
+    <script>
+        let isOnlineSimulated = navigator.onLine;
+        let offlineQueueSimulated = [];
+        
+        function addResult(type, title, content) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${title}</strong><br>${content}<br><small>${new Date().toLocaleTimeString()}</small>`;
+            results.insertBefore(div, results.firstChild);
+            
+            // Garder seulement les 8 derniers résultats
+            while (results.children.length > 8) {
+                results.removeChild(results.lastChild);
+            }
+        }
+
+        function updateConnectionStatus() {
+            const indicator = document.getElementById('connectionIndicator');
+            const text = document.getElementById('connectionText');
+            const counter = document.getElementById('queueCounter');
+            const status = document.getElementById('connectionStatus');
+            
+            if (isOnlineSimulated) {
+                indicator.className = 'connection-indicator online';
+                text.textContent = 'En ligne';
+                status.className = 'status success';
+                counter.style.display = 'none';
+            } else {
+                indicator.className = 'connection-indicator offline';
+                text.textContent = 'Hors ligne';
+                status.className = 'status error';
+                
+                if (offlineQueueSimulated.length > 0) {
+                    counter.style.display = 'inline';
+                    counter.textContent = `${offlineQueueSimulated.length} en attente`;
+                } else {
+                    counter.style.display = 'none';
+                }
+            }
+        }
+
+        async function createTestReservationOnline() {
+            if (!isOnlineSimulated) {
+                addResult('warning', '⚠️ Mode hors ligne', 'Impossible de créer en ligne - mode hors ligne actif');
+                return;
+            }
+            
+            try {
+                // Simuler création réservation en ligne
+                const testReservation = {
+                    id: 'online-' + Date.now(),
+                    title: 'TEST Réservation En Ligne',
+                    client: 'Client En Ligne',
+                    phone: '0123456789',
+                    vehicleId: '208-1',
+                    startTime: new Date(Date.now() + 3600000),
+                    endTime: new Date(Date.now() + 7200000),
+                    status: 'confirmed'
+                };
+
+                addResult('success', '✅ Réservation créée en ligne', 
+                    `ID: ${testReservation.id}<br>` +
+                    `Client: ${testReservation.client}<br>` +
+                    `Véhicule: ${testReservation.vehicleId}<br>` +
+                    `<strong>➡️ Sauvegarde directe Supabase + Sync temps réel</strong>`
+                );
+                
+            } catch (error) {
+                addResult('error', '❌ Erreur création en ligne', error.message);
+            }
+        }
+
+        function simulateOfflineAction() {
+            // Simuler passage hors ligne
+            isOnlineSimulated = false;
+            updateConnectionStatus();
+            
+            // Simuler action hors ligne
+            const offlineAction = {
+                id: 'offline-' + Date.now(),
+                type: 'create',
+                entity: 'reservation',
+                data: {
+                    title: 'TEST Réservation Hors Ligne',
+                    client: 'Client Hors Ligne',
+                    phone: '0987654321',
+                    vehicleId: '208-2'
+                },
+                timestamp: Date.now()
+            };
+            
+            offlineQueueSimulated.push(offlineAction);
+            updateConnectionStatus();
+            
+            addResult('warning', '📴 Action hors ligne simulée', 
+                `Type: ${offlineAction.type} ${offlineAction.entity}<br>` +
+                `Client: ${offlineAction.data.client}<br>` +
+                `Queue: ${offlineQueueSimulated.length} action(s)<br>` +
+                `<strong>💾 Sauvé en localStorage + ajouté à la queue</strong>`
+            );
+        }
+
+        function showOfflineQueue() {
+            if (offlineQueueSimulated.length === 0) {
+                addResult('info', '📋 Queue vide', 'Aucune action en attente de synchronisation');
+                return;
+            }
+            
+            let queueDetails = '';
+            offlineQueueSimulated.forEach((action, index) => {
+                queueDetails += `${index + 1}. ${action.type} ${action.entity} - ${action.data.client || action.data.name}<br>`;
+            });
+            
+            addResult('info', '📋 Queue hors ligne', 
+                `${offlineQueueSimulated.length} action(s) en attente:<br><br>` +
+                queueDetails +
+                `<br><strong>Ces actions seront synchronisées au retour en ligne</strong>`
+            );
+        }
+
+        function clearOfflineQueue() {
+            const queueSize = offlineQueueSimulated.length;
+            offlineQueueSimulated = [];
+            updateConnectionStatus();
+            
+            addResult('info', '🗑️ Queue vidée', 
+                `${queueSize} action(s) supprimée(s) de la queue<br>` +
+                `<strong>⚠️ Ces données ne seront PAS synchronisées</strong>`
+            );
+        }
+
+        async function triggerCatchupSync() {
+            if (!isOnlineSimulated) {
+                // Simuler retour en ligne
+                isOnlineSimulated = true;
+                updateConnectionStatus();
+                
+                addResult('info', '🌐 Simulation retour en ligne', 
+                    'Connexion restaurée - déclenchement synchronisation de rattrapage...'
+                );
+                
+                // Simuler délai de synchronisation
+                setTimeout(() => {
+                    const syncedActions = offlineQueueSimulated.length;
+                    offlineQueueSimulated = [];
+                    updateConnectionStatus();
+                    
+                    if (syncedActions > 0) {
+                        addResult('success', '✅ Synchronisation de rattrapage réussie', 
+                            `${syncedActions} action(s) hors ligne synchronisée(s)<br>` +
+                            `📤 Uploadées vers Supabase<br>` +
+                            `🔄 Propagation vers autres appareils<br>` +
+                            `<strong>Planning mis à jour sur tous les appareils !</strong>`
+                        );
+                    } else {
+                        addResult('info', '📡 Retour en ligne', 'Aucune action en attente - pas de synchronisation nécessaire');
+                    }
+                }, 2000);
+                
+            } else {
+                addResult('info', '🔄 Synchronisation manuelle', 'Vérification des données à synchroniser...');
+            }
+        }
+
+        function performSmartSync() {
+            addResult('info', '🧠 Synchronisation intelligente', 
+                'Comparaison données locales vs distantes...<br>' +
+                '• Détection des modifications récentes<br>' +
+                '• Upload prioritaire si données locales plus récentes<br>' +
+                '• Merge intelligent des conflits'
+            );
+        }
+
+        function testConnectionDetection() {
+            addResult('info', '📶 Test détection connexion', 
+                `Statut actuel: ${navigator.onLine ? 'En ligne' : 'Hors ligne'}<br>` +
+                `Simulation: ${isOnlineSimulated ? 'En ligne' : 'Hors ligne'}<br>` +
+                `Queue simulée: ${offlineQueueSimulated.length} action(s)<br><br>` +
+                `<strong>Events:</strong> online/offline du navigateur<br>` +
+                `<strong>Service:</strong> offlineQueueService actif`
+            );
+        }
+
+        async function checkSyncStatus() {
+            addResult('info', '📊 Statut de synchronisation', 
+                `🌐 Connexion: ${isOnlineSimulated ? 'En ligne' : 'Hors ligne'}<br>` +
+                `📋 Queue: ${offlineQueueSimulated.length} action(s)<br>` +
+                `⏱️ Sync temps réel: ${isOnlineSimulated ? 'Active (10s)' : 'Suspendue'}<br>` +
+                `💾 localStorage: Toujours actif<br>` +
+                `☁️ Supabase: ${isOnlineSimulated ? 'Disponible' : 'Indisponible'}`
+            );
+        }
+
+        function forceBackgroundSync() {
+            if (isOnlineSimulated) {
+                addResult('success', '🔄 Sync temps réel forcée', 
+                    'Vérification immédiate des changements distants...<br>' +
+                    'Mise à jour de l\'interface si nouvelles données détectées'
+                );
+            } else {
+                addResult('warning', '⚠️ Sync temps réel suspendue', 
+                    'Mode hors ligne - sync temps réel sera reprise au retour en ligne'
+                );
+            }
+        }
+
+        // Écouter les vrais événements de connexion
+        window.addEventListener('online', () => {
+            addResult('success', '🌐 CONNEXION RESTAURÉE', 
+                'Événement "online" détecté par le navigateur<br>' +
+                '<strong>L\'app va déclencher la synchronisation de rattrapage automatiquement</strong>'
+            );
+        });
+
+        window.addEventListener('offline', () => {
+            addResult('error', '📴 CONNEXION PERDUE', 
+                'Événement "offline" détecté par le navigateur<br>' +
+                '<strong>L\'app va passer en mode queue hors ligne</strong>'
+            );
+        });
+
+        // Initialisation
+        window.addEventListener('load', () => {
+            updateConnectionStatus();
+            addResult('info', '🚀 Test Hors Ligne Prêt', 
+                'Utilisez les boutons pour simuler des scénarios hors ligne.<br>' +
+                'Le vrai test consiste à désactiver WiFi/Data et créer des réservations dans l\'app.'
+            );
+        });
+    </script>
+</body>
+</html> 

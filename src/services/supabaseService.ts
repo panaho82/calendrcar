@@ -244,6 +244,15 @@ class SupabaseService {
     return this.isEnabled;
   }
 
+  // Exposer les URLs et clés pour le service offline (accès contrôlé)
+  getSupabaseUrl(): string {
+    return supabaseConfig.url;
+  }
+
+  getSupabaseKey(): string {
+    return supabaseConfig.anonKey;
+  }
+
   async testConnection(): Promise<boolean> {
     if (!this.isEnabled || !this.supabase) {
       return false;

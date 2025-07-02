@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabaseService } from './services/supabaseService.ts';
 import { syncService } from './services/syncService.ts';
+import { offlineQueueService } from './services/offlineQueueService.ts';
 import SyncPanel from './components/SyncPanel.tsx';
 import { 
   Calendar, 
@@ -954,7 +955,9 @@ const Sidebar = ({
   onToggleTheme,
   showNotification,
   syncStatus = 'synced',
-  realtimeSyncActive = false
+  realtimeSyncActive = false,
+  isOnline = true,
+  offlineQueue = 0
 }: { 
   currentPage: string, 
   setCurrentPage: (page: string) => void,
@@ -962,7 +965,9 @@ const Sidebar = ({
   onToggleTheme: () => void,
   showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void,
   syncStatus?: 'synced' | 'syncing' | 'error' | 'offline',
-  realtimeSyncActive?: boolean
+  realtimeSyncActive?: boolean,
+  isOnline?: boolean,
+  offlineQueue?: number
 }) => {
   const { logout, username } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1035,20 +1040,31 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* Statut de connexion */}
+        {/* Statut de connexion avec queue hors ligne */}
         <div className="mx-4 mb-2">
           <div className={`flex items-center space-x-2 px-2 py-1 rounded-lg ${
-            pwa.isOnline 
+            isOnline 
               ? 'bg-green-600/20 text-green-400' 
               : 'bg-red-600/20 text-red-400'
           }`}>
-            {pwa.isOnline ? 
+            {isOnline ? 
               <Wifi className="h-3 w-3" /> : 
               <WifiOff className="h-3 w-3" />
             }
             <span className={`text-xs transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
-              {pwa.isOnline ? 'En ligne' : 'Hors ligne'}
+              {isOnline ? 'En ligne' : 'Hors ligne'}
+              {!isOnline && offlineQueue > 0 && isExpanded && (
+                <span className="block text-xs text-yellow-400 mt-1">
+                  {offlineQueue} action{offlineQueue > 1 ? 's' : ''} en attente
+                </span>
+              )}
             </span>
+            {/* Badge queue hors ligne */}
+            {!isOnline && offlineQueue > 0 && (
+              <div className="bg-yellow-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                {offlineQueue > 9 ? '9+' : offlineQueue}
+              </div>
+            )}
           </div>
         </div>
 
@@ -3787,6 +3803,10 @@ const AuthenticatedApp: React.FC = () => {
   // État du statut de synchronisation
   const [lastSyncStatus, setLastSyncStatus] = useState<'synced' | 'syncing' | 'error' | 'offline'>('synced');
   const [realtimeSyncActive, setRealtimeSyncActive] = useState(false);
+  
+  // État de connexion hors ligne
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlineQueue, setOfflineQueue] = useState(0);
 
   // Fonction pour afficher une notification
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -3928,6 +3948,34 @@ const AuthenticatedApp: React.FC = () => {
           console.log('🟡 Mode localStorage uniquement');
         }
 
+        // 🚀 INITIALISER LE SERVICE HORS LIGNE
+        offlineQueueService.onOnline((status) => {
+          console.log('🌐 Retour en ligne détecté par offlineQueueService');
+          setIsOnline(true);
+          setOfflineQueue(status.queuedActions);
+          showNotification('📡 Retour en ligne - synchronisation...', 'info');
+        });
+
+        offlineQueueService.onOffline((status) => {
+          console.log('📴 Passage hors ligne détecté par offlineQueueService');
+          setIsOnline(false);
+          setOfflineQueue(status.queuedActions);
+          showNotification('📴 Mode hors ligne - données sauvées localement', 'warning');
+        });
+
+        offlineQueueService.onSync((result) => {
+          console.log('🔄 Synchronisation de rattrapage terminée:', result);
+          setOfflineQueue(0);
+          if (result.success && result.syncedActions > 0) {
+            showNotification(`✅ ${result.syncedActions} actions hors ligne synchronisées`, 'success');
+          }
+        });
+
+        // Vérifier le statut initial
+        const initialStatus = offlineQueueService.getOfflineStatus();
+        setIsOnline(initialStatus.isOnline);
+        setOfflineQueue(initialStatus.queuedActions);
+
       } catch (error) {
         console.error('Erreur chargement initial:', error);
         setLastSyncStatus('error');
@@ -3975,13 +4023,23 @@ const AuthenticatedApp: React.FC = () => {
 
   useEffect(() => {
     if (reservations.length > 0) {
-      // Sauvegarder avec Supabase + localStorage + Auto-Sync
+      // Sauvegarder avec Supabase + localStorage + Auto-Sync + Queue hors ligne
       const saveReservations = async () => {
         try {
-          await supabaseService.saveReservations(reservations);
-          
-          // Marquer la synchronisation immédiatement
+          // Toujours sauvegarder en localStorage immédiatement
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(reservations));
           localStorage.setItem('calendrcar-last-sync', new Date().toISOString());
+          
+          // Si hors ligne, ajouter à la queue
+          if (!navigator.onLine) {
+            offlineQueueService.addToQueue('update', 'reservation', { reservations });
+            setOfflineQueue(offlineQueueService.getQueue().length);
+            console.log('📴 Réservations ajoutées à la queue hors ligne');
+            return;
+          }
+          
+          // Si en ligne, sauvegarder sur Supabase
+          await supabaseService.saveReservations(reservations);
           
           // 🚀 ÉTAPE 2: Auto-Sync après modification de réservation
           const autoSyncResult = await syncService.performAutoSyncAfterChange('reservation');
@@ -4004,9 +4062,21 @@ const AuthenticatedApp: React.FC = () => {
 
   useEffect(() => {
     if (vehicles.length > 0) {
-      // Sauvegarder avec Supabase + localStorage + Auto-Sync
+      // Sauvegarder avec Supabase + localStorage + Auto-Sync + Queue hors ligne
       const saveVehicles = async () => {
         try {
+          // Toujours sauvegarder en localStorage immédiatement
+          localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(vehicles));
+          
+          // Si hors ligne, ajouter à la queue
+          if (!navigator.onLine) {
+            offlineQueueService.addToQueue('update', 'vehicle', { vehicles });
+            setOfflineQueue(offlineQueueService.getQueue().length);
+            console.log('📴 Véhicules ajoutés à la queue hors ligne');
+            return;
+          }
+          
+          // Si en ligne, sauvegarder sur Supabase
           await supabaseService.saveVehicles(vehicles);
           
           // 🚀 ÉTAPE 2: Auto-Sync après modification de véhicule
@@ -4060,6 +4130,8 @@ const AuthenticatedApp: React.FC = () => {
         showNotification={showNotification}
         syncStatus={lastSyncStatus}
         realtimeSyncActive={realtimeSyncActive}
+        isOnline={isOnline}
+        offlineQueue={offlineQueue}
       />
       
       {/* Contenu principal */}
