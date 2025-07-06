@@ -82,32 +82,51 @@ class SupabaseService {
     }
 
     try {
-      // Utiliser upsert au lieu de delete/insert pour éviter les conflits
-      const formattedData = reservations.map(r => ({
-        id: r.id,
-        title: r.title,
-        client: r.client,
-        phone: r.phone,
-        vehicleid: r.vehicleId,
-        starttime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
-        endtime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString(),
-        status: r.status,
-        notes: r.notes || '',
-        amount: r.amount || 0
-      }));
+      // Pour gérer correctement les suppressions, on doit faire delete + insert
+      // en mode transaction sécurisé
       
-      console.log('📝 SAVE: Upsert des réservations...');
-      
-      // Utiliser upsert (INSERT avec ON CONFLICT)
-      const { error } = await this.supabase
+      console.log('🗑️ SAVE: Suppression des réservations existantes...');
+      const { error: deleteError } = await this.supabase
         .from('reservations')
-        .upsert(formattedData, { 
-          onConflict: 'id',
-          ignoreDuplicates: false 
-        });
+        .delete()
+        .neq('id', ''); // Supprime toutes les réservations
 
-      if (error) throw error;
-      console.log('✅ SAVE: Réservations sauvegardées avec succès');
+      if (deleteError) {
+        console.error('❌ Erreur suppression:', deleteError);
+        throw deleteError;
+      }
+
+      // Si on a des réservations à sauvegarder
+      if (reservations.length > 0) {
+        console.log('📝 SAVE: Insertion des réservations actuelles...');
+        
+        const formattedData = reservations.map(r => ({
+          id: r.id,
+          title: r.title,
+          client: r.client,
+          phone: r.phone,
+          vehicleid: r.vehicleId,
+          starttime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
+          endtime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString(),
+          status: r.status,
+          notes: r.notes || '',
+          amount: r.amount || 0
+        }));
+        
+        const { error: insertError } = await this.supabase
+          .from('reservations')
+          .insert(formattedData);
+
+        if (insertError) {
+          console.error('❌ Erreur insertion:', insertError);
+          throw insertError;
+        }
+        
+        console.log('✅ SAVE:', reservations.length, 'réservations sauvegardées avec succès');
+      } else {
+        console.log('✅ SAVE: Toutes les réservations supprimées avec succès');
+      }
+      
     } catch (error) {
       console.error('❌ SAVE: Erreur sauvegarde réservations:', error);
       throw error;
@@ -147,18 +166,35 @@ class SupabaseService {
     }
 
     try {
-      console.log('📝 SAVE: Upsert des véhicules...');
-      
-      // Utiliser upsert au lieu de delete/insert pour éviter les conflits
-      const { error } = await this.supabase
+      console.log('🗑️ SAVE: Suppression des véhicules existants...');
+      const { error: deleteError } = await this.supabase
         .from('vehicles')
-        .upsert(vehicles, { 
-          onConflict: 'id',
-          ignoreDuplicates: false 
-        });
+        .delete()
+        .neq('id', ''); // Supprime tous les véhicules
 
-      if (error) throw error;
-      console.log('✅ SAVE: Véhicules sauvegardés avec succès');
+      if (deleteError) {
+        console.error('❌ Erreur suppression véhicules:', deleteError);
+        throw deleteError;
+      }
+
+      // Si on a des véhicules à sauvegarder
+      if (vehicles.length > 0) {
+        console.log('📝 SAVE: Insertion des véhicules actuels...');
+        
+        const { error: insertError } = await this.supabase
+          .from('vehicles')
+          .insert(vehicles);
+
+        if (insertError) {
+          console.error('❌ Erreur insertion véhicules:', insertError);
+          throw insertError;
+        }
+        
+        console.log('✅ SAVE:', vehicles.length, 'véhicules sauvegardés avec succès');
+      } else {
+        console.log('✅ SAVE: Tous les véhicules supprimés avec succès');
+      }
+      
     } catch (error) {
       console.error('❌ SAVE: Erreur sauvegarde véhicules:', error);
       throw error;
