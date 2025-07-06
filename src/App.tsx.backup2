@@ -3782,14 +3782,15 @@ const Vehicles = ({ vehicles, setVehicles, isDarkMode, showNotification }: { veh
 
 // Composant principal avec authentification
 const AuthenticatedApp: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState('dashboard');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [currentPage, setCurrentPage] = useState("dashboard");
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('calendrcar-theme') === 'dark';
+    const saved = localStorage.getItem('calendrcar-theme');
+    return saved === 'dark';
   });
-  
-  // État de notification
+
+  // État des notifications
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
@@ -3805,9 +3806,6 @@ const AuthenticatedApp: React.FC = () => {
   
   // État de connexion hors ligne
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
-  // Flag pour éviter les sauvegardes pendant le chargement initial
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Fonction pour afficher une notification
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -3847,9 +3845,6 @@ const AuthenticatedApp: React.FC = () => {
         // Vérifier le statut de connexion
         setIsOnline(navigator.onLine);
         
-        // Marquer la fin du chargement initial
-        setIsInitialLoad(false);
-        
       } catch (error) {
         console.error('❌ Erreur chargement initial:', error);
         setLastSyncStatus('error');
@@ -3858,9 +3853,6 @@ const AuthenticatedApp: React.FC = () => {
         // Utiliser les données par défaut en cas d'erreur
         setReservations(EXAMPLE_RESERVATIONS);
         setVehicles(INITIAL_VEHICLES);
-        
-        // Marquer la fin du chargement initial même en cas d'erreur
-        setIsInitialLoad(false);
       }
     };
 
@@ -3887,9 +3879,6 @@ const AuthenticatedApp: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Ne pas sauvegarder pendant le chargement initial
-    if (isInitialLoad) return;
-    
     if (reservations.length > 0) {
       // Sauvegarder directement dans Supabase
       const saveReservations = async () => {
@@ -3910,12 +3899,9 @@ const AuthenticatedApp: React.FC = () => {
       };
       saveReservations();
     }
-  }, [reservations, isInitialLoad]);
+  }, [reservations]);
 
   useEffect(() => {
-    // Ne pas sauvegarder pendant le chargement initial
-    if (isInitialLoad) return;
-    
     if (vehicles.length > 0) {
       // Sauvegarder directement dans Supabase
       const saveVehicles = async () => {
@@ -3936,7 +3922,7 @@ const AuthenticatedApp: React.FC = () => {
       };
       saveVehicles();
     }
-  }, [vehicles, isInitialLoad]);
+  }, [vehicles]);
 
   // Gestion du thème
   const toggleTheme = () => {

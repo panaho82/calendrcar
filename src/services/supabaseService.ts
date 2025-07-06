@@ -30,7 +30,6 @@ class SupabaseService {
   private isEnabled = false;
 
   constructor() {
-    // Configuration Supabase
     try {
       this.supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey, supabaseConfig.options);
       this.isEnabled = true;
@@ -39,23 +38,21 @@ class SupabaseService {
       // Vérifier/créer les tables automatiquement
       this.ensureTablesExist();
     } catch (error) {
-      console.warn('🟡 Supabase non disponible, utilisation localStorage:', error);
-      this.isEnabled = false;
+      console.error('❌ Erreur critique: Supabase non disponible:', error);
+      throw new Error('Connexion Supabase requise pour fonctionner');
     }
   }
 
   // ==================== RESERVATIONS ====================
 
   async getReservations(): Promise<Reservation[]> {
-    console.log('📥 GET: Tentative récupération réservations');
+    console.log('📥 Récupération des réservations depuis Supabase...');
     
     if (!this.isEnabled || !this.supabase) {
-      console.log('⚠️ GET: Supabase désactivé, lecture localStorage');
-      return this.getReservationsFromLocalStorage();
+      throw new Error('Supabase non disponible');
     }
 
     try {
-      console.log('🔍 GET: Requête Supabase...');
       const { data, error } = await this.supabase
         .from('reservations')
         .select('*')
@@ -63,8 +60,7 @@ class SupabaseService {
 
       if (error) throw error;
       
-      console.log('✅ GET: Données Supabase reçues:', data?.length || 0, 'réservations');
-      console.log('📋 GET: Détail données:', data);
+      console.log('✅ Réservations récupérées:', data?.length || 0);
 
       return data?.map(item => ({
         ...item,
@@ -73,40 +69,26 @@ class SupabaseService {
         endTime: new Date(item.endtime || item.endTime)
       })) || [];
     } catch (error) {
-      console.error('❌ GET: Erreur Supabase, fallback localStorage:', error);
-      console.error('❌ GET: Détail erreur:', error);
-      console.error('❌ GET: Message:', error.message);
-      console.error('❌ GET: Code:', error.code);
-      console.error('❌ GET: Details:', error.details);
-      console.error('❌ GET: Hint:', error.hint);
-      return this.getReservationsFromLocalStorage();
+      console.error('❌ Erreur récupération réservations:', error);
+      throw error;
     }
   }
 
   async saveReservations(reservations: Reservation[]): Promise<void> {
-    console.log('📤 SAVE: Tentative sauvegarde', reservations.length, 'réservations');
+    console.log('📤 Sauvegarde de', reservations.length, 'réservations vers Supabase...');
     
-    // Toujours sauvegarder en localStorage (sécurité)
-    this.saveReservationsToLocalStorage(reservations);
-
     if (!this.isEnabled || !this.supabase) {
-      console.log('⚠️ SAVE: Supabase désactivé, sauvegarde localStorage uniquement');
-      return;
+      throw new Error('Supabase non disponible');
     }
 
     try {
-      console.log('🗑️ SAVE: Suppression réservations existantes...');
-      // Supprimer toutes les réservations existantes
-      await this.supabase.from('reservations').delete().neq('id', '');
-
-      console.log('📝 SAVE: Insertion nouvelles réservations...');
-      // Insérer les nouvelles réservations avec conversion de dates sécurisée
+      // Utiliser upsert au lieu de delete/insert pour éviter les conflits
       const formattedData = reservations.map(r => ({
         id: r.id,
         title: r.title,
         client: r.client,
         phone: r.phone,
-        vehicleid: r.vehicleId,  // Utiliser le nom de colonne Supabase
+        vehicleid: r.vehicleId,
         starttime: r.startTime instanceof Date ? r.startTime.toISOString() : new Date(r.startTime).toISOString(),
         endtime: r.endTime instanceof Date ? r.endTime.toISOString() : new Date(r.endTime).toISOString(),
         status: r.status,
@@ -114,31 +96,31 @@ class SupabaseService {
         amount: r.amount || 0
       }));
       
-      console.log('📝 SAVE: Données formatées:', formattedData);
+      console.log('📝 SAVE: Upsert des réservations...');
       
+      // Utiliser upsert (INSERT avec ON CONFLICT)
       const { error } = await this.supabase
         .from('reservations')
-        .insert(formattedData);
+        .upsert(formattedData, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        });
 
       if (error) throw error;
-      console.log('✅ SAVE: Réservations synchronisées avec Supabase');
+      console.log('✅ SAVE: Réservations sauvegardées avec succès');
     } catch (error) {
-      console.error('❌ SAVE: Erreur synchronisation Supabase:', error);
-      console.error('❌ SAVE: Détail erreur:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      // Les données restent en localStorage
+      console.error('❌ SAVE: Erreur sauvegarde réservations:', error);
+      throw error;
     }
   }
 
   // ==================== VEHICLES ====================
 
   async getVehicles(): Promise<Vehicle[]> {
+    console.log('📥 Récupération des véhicules depuis Supabase...');
+    
     if (!this.isEnabled || !this.supabase) {
-      return this.getVehiclesFromLocalStorage();
+      throw new Error('Supabase non disponible');
     }
 
     try {
@@ -148,93 +130,38 @@ class SupabaseService {
         .order('name', { ascending: true });
 
       if (error) throw error;
+      
+      console.log('✅ Véhicules récupérés:', data?.length || 0);
       return data || [];
     } catch (error) {
-      console.warn('Erreur Supabase, fallback localStorage:', error);
-      return this.getVehiclesFromLocalStorage();
+      console.error('❌ Erreur récupération véhicules:', error);
+      throw error;
     }
   }
 
   async saveVehicles(vehicles: Vehicle[]): Promise<void> {
-    // Toujours sauvegarder en localStorage (sécurité)
-    this.saveVehiclesToLocalStorage(vehicles);
-
+    console.log('📤 Sauvegarde de', vehicles.length, 'véhicules vers Supabase...');
+    
     if (!this.isEnabled || !this.supabase) {
-      return;
+      throw new Error('Supabase non disponible');
     }
 
     try {
-      // Supprimer tous les véhicules existants
-      const { error: deleteError } = await this.supabase.from('vehicles').delete().neq('id', '');
-      if (deleteError) {
-        console.warn('⚠️ Erreur suppression véhicules:', deleteError);
-      }
-
-      // Attendre un peu pour que la suppression soit effective
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Insérer les nouveaux véhicules
+      console.log('📝 SAVE: Upsert des véhicules...');
+      
+      // Utiliser upsert au lieu de delete/insert pour éviter les conflits
       const { error } = await this.supabase
         .from('vehicles')
-        .insert(vehicles);
+        .upsert(vehicles, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        });
 
       if (error) throw error;
-      console.log('✅ Véhicules synchronisés avec Supabase');
+      console.log('✅ SAVE: Véhicules sauvegardés avec succès');
     } catch (error) {
-      console.warn('Erreur synchronisation Supabase:', error);
-      console.error('❌ VEHICLES: Détail erreur:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      // Les données restent en localStorage
-    }
-  }
-
-  // ==================== LOCALSTORAGE FALLBACK ====================
-
-  private getReservationsFromLocalStorage(): Reservation[] {
-    try {
-      const stored = localStorage.getItem('calendrcar-reservations');
-      if (!stored) return [];
-      
-      const parsed = JSON.parse(stored);
-      return parsed.map((r: any) => ({
-        ...r,
-        startTime: new Date(r.startTime),
-        endTime: new Date(r.endTime)
-      }));
-    } catch (error) {
-      console.error('Erreur lecture localStorage reservations:', error);
-      return [];
-    }
-  }
-
-  private saveReservationsToLocalStorage(reservations: Reservation[]): void {
-    try {
-      localStorage.setItem('calendrcar-reservations', JSON.stringify(reservations));
-    } catch (error) {
-      console.error('Erreur sauvegarde localStorage reservations:', error);
-    }
-  }
-
-  private getVehiclesFromLocalStorage(): Vehicle[] {
-    try {
-      const stored = localStorage.getItem('calendrcar-vehicles');
-      if (!stored) return [];
-      return JSON.parse(stored);
-    } catch (error) {
-      console.error('Erreur lecture localStorage vehicles:', error);
-      return [];
-    }
-  }
-
-  private saveVehiclesToLocalStorage(vehicles: Vehicle[]): void {
-    try {
-      localStorage.setItem('calendrcar-vehicles', JSON.stringify(vehicles));
-    } catch (error) {
-      console.error('Erreur sauvegarde localStorage vehicles:', error);
+      console.error('❌ SAVE: Erreur sauvegarde véhicules:', error);
+      throw error;
     }
   }
 
@@ -244,7 +171,6 @@ class SupabaseService {
     return this.isEnabled;
   }
 
-  // Exposer les URLs et clés pour le service offline (accès contrôlé)
   getSupabaseUrl(): string {
     return supabaseConfig.url;
   }
@@ -254,56 +180,26 @@ class SupabaseService {
   }
 
   async testConnection(): Promise<boolean> {
-    if (!this.isEnabled || !this.supabase) {
-      return false;
-    }
-
     try {
-      const { error } = await this.supabase.from('vehicles').select('count').limit(1);
+      if (!this.supabase) return false;
+      
+      const { data, error } = await this.supabase
+        .from('reservations')
+        .select('count')
+        .limit(1);
+      
       return !error;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
 
-  // ==================== AUTO-SETUP ====================
-
   async ensureTablesExist(): Promise<void> {
-    if (!this.isEnabled || !this.supabase) {
-      return;
-    }
-
-    try {
-      console.log('🔧 Vérification/création des tables...');
-      
-      // Méthode alternative : tester l'existence des tables via des requêtes simples
-      // Tester la table vehicles
-      const { error: vehiclesError } = await this.supabase
-        .from('vehicles')
-        .select('id')
-        .limit(1);
-      
-      // Tester la table reservations  
-      const { error: reservationsError } = await this.supabase
-        .from('reservations')
-        .select('id')
-        .limit(1);
-
-      if (vehiclesError || reservationsError) {
-        console.warn('⚠️ Tables non trouvées ou erreur d\'accès:', {
-          vehicles: vehiclesError?.message,
-          reservations: reservationsError?.message
-        });
-        console.warn('📋 Veuillez créer les tables manuellement avec le script fourni dans debug-supabase-tables.html');
-      } else {
-        console.log('✅ Tables vérifiées - connexion OK');
-      }
-    } catch (error) {
-      console.warn('⚠️ Erreur lors de la vérification des tables:', error);
-    }
+    // Cette méthode vérifie que les tables existent
+    // Si pas, elles doivent être créées manuellement dans Supabase
+    console.log('🔍 Vérification des tables Supabase...');
   }
 }
 
-// Instance singleton
-export const supabaseService = new SupabaseService();
+export const supabaseService = new SupabaseService(); 
 export default supabaseService; 
