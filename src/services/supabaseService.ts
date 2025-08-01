@@ -81,26 +81,53 @@ class SupabaseService {
       throw new Error('Supabase non disponible');
     }
 
-    try {
-      // Pour gérer correctement les suppressions, on doit faire delete + insert
-      // en mode transaction sécurisé
-      
-      console.log('🗑️ SAVE: Suppression des réservations existantes...');
-      const { error: deleteError } = await this.supabase
-        .from('reservations')
-        .delete()
-        .neq('id', ''); // Supprime toutes les réservations
+    // 🚨 PROTECTION: Ne jamais vider la base avec un tableau vide accidentel
+    if (reservations.length === 0) {
+      console.warn('⚠️ PROTECTION: Tentative de sauvegarde avec tableau vide - OPÉRATION BLOQUÉE pour éviter la perte de données');
+      console.warn('   Si vous voulez vraiment supprimer toutes les réservations, utilisez deleteAllReservations()');
+      return;
+    }
 
-      if (deleteError) {
-        console.error('❌ Erreur suppression:', deleteError);
-        throw deleteError;
+    try {
+      // Récupérer les réservations actuelles pour comparaison sécurisée
+      const { data: currentReservations, error: getCurrentError } = await this.supabase
+        .from('reservations')
+        .select('id');
+
+      if (getCurrentError) {
+        console.error('❌ Erreur récupération réservations actuelles:', getCurrentError);
+        throw getCurrentError;
       }
 
-      // Si on a des réservations à sauvegarder
-      if (reservations.length > 0) {
-        console.log('📝 SAVE: Insertion des réservations actuelles...');
+      const currentIds = new Set(currentReservations?.map(r => r.id) || []);
+      const newIds = new Set(reservations.map(r => r.id));
+
+      // Supprimer seulement les réservations qui ne sont plus dans le nouveau set
+      const idsToDelete = [...currentIds].filter(id => !newIds.has(id));
+      
+      if (idsToDelete.length > 0) {
+        console.log('🗑️ SAVE: Suppression de', idsToDelete.length, 'réservations supprimées...');
+        const { error: deleteError } = await this.supabase
+          .from('reservations')
+          .delete()
+          .in('id', idsToDelete);
+
+        if (deleteError) {
+          console.error('❌ Erreur suppression sélective:', deleteError);
+          throw deleteError;
+        }
+      }
+
+      // Séparer les nouvelles réservations des modifications
+      const existingIds = [...currentIds];
+      const newReservations = reservations.filter(r => !existingIds.includes(r.id));
+      const updatedReservations = reservations.filter(r => existingIds.includes(r.id));
+
+      // Insérer les nouvelles réservations
+      if (newReservations.length > 0) {
+        console.log('📝 SAVE: Insertion de', newReservations.length, 'nouvelles réservations...');
         
-        const formattedData = reservations.map(r => ({
+        const formattedNewData = newReservations.map(r => ({
           id: r.id,
           title: r.title,
           client: r.client,
@@ -115,20 +142,73 @@ class SupabaseService {
         
         const { error: insertError } = await this.supabase
           .from('reservations')
-          .insert(formattedData);
+          .insert(formattedNewData);
 
         if (insertError) {
-          console.error('❌ Erreur insertion:', insertError);
+          console.error('❌ Erreur insertion nouvelles réservations:', insertError);
           throw insertError;
         }
-        
-        console.log('✅ SAVE:', reservations.length, 'réservations sauvegardées avec succès');
-      } else {
-        console.log('✅ SAVE: Toutes les réservations supprimées avec succès');
       }
+
+      // Mettre à jour les réservations existantes
+      if (updatedReservations.length > 0) {
+        console.log('🔄 SAVE: Mise à jour de', updatedReservations.length, 'réservations existantes...');
+        
+        for (const reservation of updatedReservations) {
+          const formattedData = {
+            title: reservation.title,
+            client: reservation.client,
+            phone: reservation.phone,
+            vehicleid: reservation.vehicleId,
+            starttime: reservation.startTime instanceof Date ? reservation.startTime.toISOString() : new Date(reservation.startTime).toISOString(),
+            endtime: reservation.endTime instanceof Date ? reservation.endTime.toISOString() : new Date(reservation.endTime).toISOString(),
+            status: reservation.status,
+            notes: reservation.notes || '',
+            amount: reservation.amount || 0
+          };
+
+          const { error: updateError } = await this.supabase
+            .from('reservations')
+            .update(formattedData)
+            .eq('id', reservation.id);
+
+          if (updateError) {
+            console.error('❌ Erreur mise à jour réservation:', updateError);
+            throw updateError;
+          }
+        }
+      }
+      
+      console.log('✅ SAVE:', reservations.length, 'réservations sauvegardées avec succès (méthode sécurisée)');
       
     } catch (error) {
       console.error('❌ SAVE: Erreur sauvegarde réservations:', error);
+      throw error;
+    }
+  }
+
+  // Méthode séparée pour supprimer toutes les réservations (explicite et sécurisée)
+  async deleteAllReservations(): Promise<void> {
+    console.log('🚨 SUPPRESSION COMPLÈTE: Toutes les réservations vont être supprimées...');
+    
+    if (!this.isEnabled || !this.supabase) {
+      throw new Error('Supabase non disponible');
+    }
+
+    try {
+      const { error: deleteError } = await this.supabase
+        .from('reservations')
+        .delete()
+        .neq('id', '');
+
+      if (deleteError) {
+        console.error('❌ Erreur suppression complète:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('✅ SUPPRESSION COMPLÈTE: Toutes les réservations supprimées');
+    } catch (error) {
+      console.error('❌ Erreur suppression complète:', error);
       throw error;
     }
   }
