@@ -23,3 +23,9 @@
   from = "/*"
   to = "/index.html"
   status = 200 
+
+# === Scheduled backup function ===
+[[scheduled.functions]]
+  name = "backup-reservations"
+  # Tous les jours à 23:30 UTC (ajustez selon votre fuseau)
+  cron = "30 23 * * *"
